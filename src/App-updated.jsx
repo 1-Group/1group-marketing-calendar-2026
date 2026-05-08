@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Download } from "lucide-react";
+import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Download, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText } from "lucide-react";
 
 // ─── AUTH: USERS + ACCESS CODES ───
 // NOTE: Client-side soft gate only. Anyone with DevTools can read this file.
@@ -403,63 +403,97 @@ const MICE_EVENTS = [
 ];
 
 const SG_EVENTS_RAW = [
-  {m:"Jan",d:"02-03",n:"SINGLAND FESTIVAL - NE-YO & Intl Artists",v:"Marina Bay Sands",t:"Concert"},
-  {m:"Jan",d:"02-03",n:"Super Junior Super Show 10",v:"Singapore Indoor Stadium",t:"Concert"},
-  {m:"Jan",d:"04",n:"Air Supply 50th Anniversary Tour",v:"MBS Grand Ballroom",t:"Concert"},
-  {m:"Jan",d:"08-11",n:"Singapore Motorshow 2026",v:"Suntec Convention Centre",t:"Trade Show"},
-  {m:"Jan",d:"17-18",n:"Tomorrow X Together (TXT) Concert",v:"Singapore Indoor Stadium",t:"Concert"},
-  {m:"Jan",d:"23-25",n:"Art SG Contemporary Art Fair 2026",v:"Marina Bay Sands",t:"Art Exhibition"},
-  {m:"Jan",d:"13-14",n:"Mediterranean Food & Wine B2B",v:"Suntec",t:"Trade Show"},
-  {m:"Feb",d:"03-08",n:"Singapore Airshow 2026",v:"Changi Exhibition Centre",t:"Trade Show"},
-  {m:"Feb",d:"02-04",n:"Augmented World Expo",v:"Singapore Expo",t:"Technology Expo"},
-  {m:"Feb",d:"06-22",n:"Cirque Du Soleil - KOOZA",v:"Bayfront Event Space",t:"Entertainment"},
-  {m:"Feb",d:"25-26",n:"Aviation Festival Asia",v:"Suntec",t:"Conference"},
-  {m:"Feb",d:"04-06",n:"Asia Photonics Expo (APE 2026)",v:"Marina Bay Sands",t:"Technology Expo"},
-  {m:"Mar",d:"12",n:"COMEX / IT SHOW",v:"Suntec Singapore",t:"Technology Expo"},
-  {m:"Mar",d:"24-26",n:"BuildTech Asia 2026",v:"Singapore Expo",t:"Trade Show"},
-  {m:"Mar",d:"25-27",n:"Asia Pacific Maritime (APM)",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Mar",d:"31",n:"GEO Connect Asia",v:"Marina Bay Sands",t:"Conference"},
-  {m:"Mar",d:"05",n:"ZAK SALAAM INDIA Expo",v:"Singapore Expo",t:"Trade Show"},
-  {m:"Mar",d:"31",n:"Digital Construction Asia",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Apr",d:"03-12",n:"ARTBOX CAMP 2026",v:"Singapore EXPO",t:"Creative Festival"},
-  {m:"Apr",d:"09-11",n:"GITEX ASIA x AI Everything 2026",v:"Marina Bay Sands",t:"Technology Expo"},
-  {m:"Apr",d:"17-19",n:"IDEM Singapore - Dental Exhibition",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Apr",d:"20-24",n:"Beauty Asia 2026",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Apr",d:"21-24",n:"FHA-HoReCa",v:"Singapore Expo",t:"Trade Show"},
-  {m:"Apr",d:"21-24",n:"Black Hat Asia",v:"Marina Bay Sands",t:"Security Conference"},
-  {m:"Apr",d:"21-24",n:"ProWine Asia",v:"Singapore Expo",t:"Trade Show"},
-  {m:"Apr",d:"14-15",n:"World Ageing Festival",v:"Singapore Expo",t:"Conference"},
-  {m:"May",d:"04-07",n:"HR Tech Asia",v:"Suntec",t:"Technology Expo"},
-  {m:"May",d:"10-14",n:"TFWA Asia Pacific",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"May",d:"19-22",n:"ATxSG / CommunicAsia / BroadcastAsia",v:"Singapore Expo",t:"Technology Expo"},
-  {m:"May",d:"20-22",n:"The AI Summit Singapore 2026",v:"Singapore Expo",t:"Technology Summit"},
-  {m:"May",d:"29",n:"Singapore Food Expo",v:"Singapore Expo",t:"Consumer Expo"},
-  {m:"Jun",d:"01-04",n:"World Aquaculture Singapore",v:"Singapore Expo",t:"Conference"},
-  {m:"Jun",d:"13",n:"(G)I-DLE Concert",v:"Singapore Indoor Stadium",t:"Concert"},
-  {m:"Jun",d:"14-16",n:"World Cities Summit",v:"Suntec",t:"Conference"},
-  {m:"Jun",d:"15-19",n:"Singapore Intl Water Week (SIWW)",v:"Marina Bay Sands",t:"Conference"},
-  {m:"Jun",d:"29",n:"ILTM Asia Pacific",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Jul",d:"09-12",n:"Singapore Intl Jewellery Expo (SIJE)",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Jul",d:"15-17",n:"SIGEP Asia",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Jul",d:"15-17",n:"Speciality Coffee & Tea Asia",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Aug",d:"26-27",n:"The Business Show Asia",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Sep",d:"02-04",n:"Seafood Expo Asia",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Sep",d:"09-11",n:"Medical Fair Asia",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Sep",d:"22-24",n:"MRO Asia Pacific",v:"Singapore Expo",t:"Trade Show"},
-  {m:"Sep",d:"29-30",n:"Tech Week Singapore",v:"TBD",t:"Technology Conference"},
-  {m:"Oct",d:"09-11",n:"⭐ F1 SINGAPORE GRAND PRIX 2026",v:"Marina Bay Street Circuit",t:"Sporting Event"},
-  {m:"Oct",d:"09-11",n:"F1 Concert Series & Entertainment",v:"Marina Bay / Padang",t:"Concert"},
-  {m:"Oct",d:"11-12",n:"TWICE Concert",v:"Singapore Indoor Stadium",t:"Concert"},
-  {m:"Oct",d:"18-19",n:"NCT Dream Concert",v:"Singapore Indoor Stadium",t:"Concert"},
-  {m:"Oct",d:"21-23",n:"ITB Asia / MICE Show Asia 2026",v:"Marina Bay Sands",t:"Trade Show"},
-  {m:"Oct",d:"22-24",n:"Food Japan",v:"Suntec City",t:"Food Expo"},
-  {m:"Nov",d:"18-20",n:"Singapore FinTech Festival 2026",v:"Singapore EXPO",t:"Festival"},
-  {m:"Nov",d:"24-26",n:"OSEA - Offshore Energy Week",v:"Marina Bay Sands",t:"Conference"},
-  {m:"Nov",d:"29-30",n:"BLACKPINK Concert",v:"National Stadium",t:"Concert"},
-  {m:"Dec",d:"17",n:"⭐ BTS World Tour (Day 1)",v:"National Stadium",t:"Concert"},
-  {m:"Dec",d:"19",n:"⭐ BTS World Tour (Day 2)",v:"National Stadium",t:"Concert"},
-  {m:"Dec",d:"20",n:"⭐ BTS World Tour (Day 3)",v:"National Stadium",t:"Concert"},
-  {m:"Dec",d:"22",n:"⭐ BTS World Tour (Day 4)",v:"National Stadium",t:"Concert"},
+  {m:1,sd:2,ed:3,ds:"2–3 Jan",n:"SINGLAND Festival – NE-YO & International Artists",v:"Marina Bay Sands",i:"Entertainment / Festival",o:"SINGLAND Festival Organizers",c:"",w:"",em:[],p:"General public, entertainment fans",no:"",why:"",tier:"",s:null,st:""},
+  {m:1,sd:2,ed:3,ds:"2–3 Jan",n:"Super Junior Super Show 10 – 20th Anniversary",v:"Singapore Indoor Stadium",i:"Concert / K-pop",o:"SM Entertainment",c:"",w:"www.smtown.com",em:[],p:"K-pop fans, Super Junior fandom",no:"",why:"",tier:"",s:null,st:""},
+  {m:1,sd:4,ed:null,ds:"4 Jan",n:"Air Supply 50th Anniversary Tour",v:"MBS Grand Ballroom",i:"Concert / Entertainment",o:"Concert Promoters",c:"",w:"",em:[],p:"Fans 30–60 age group",no:"",why:"",tier:"",s:null,st:""},
+  {m:1,sd:8,ed:11,ds:"8–11 Jan",n:"Singapore Motorshow 2026",v:"Suntec Convention Centre",i:"Trade Show / Automotive & EV",o:"Motorshow Organizers (SIAM)",c:"",w:"www.singaporemotorshow.com.sg",em:[],p:"Auto industry, dealers, EV companies, public",no:"",why:"",tier:"",s:null,st:""},
+  {m:1,sd:13,ed:14,ds:"13–14 Jan",n:"Mediterranean Food & Wine B2B Trade Show",v:"Suntec Convention Centre",i:"Trade Show / F&B",o:"Trade Show Organizers",c:"",w:"",em:[],p:"F&B importers, distributors, buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:1,sd:17,ed:18,ds:"17–18 Jan",n:"Tomorrow X Together (TXT) Concert",v:"Singapore Indoor Stadium",i:"Concert / K-pop",o:"TXT Tour Promoters",c:"",w:"",em:[],p:"K-pop fans",no:"",why:"",tier:"",s:null,st:""},
+  {m:1,sd:23,ed:25,ds:"23–25 Jan",n:"Art SG Contemporary Art Fair 2026",v:"Marina Bay Sands",i:"Art Exhibition / Arts & Culture",o:"Art SG Organizers",c:"",w:"www.artsg.com",em:[],p:"Art collectors, galleries, high-net-worth individuals",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:2,ed:4,ds:"2–4 Feb",n:"Singapore Airshow – Space Summit",v:"Changi Exhibition Centre",i:"Trade Show / Aerospace & Defence",o:"Singapore Airshow Organising Committee / Experia Events",c:"",w:"www.singaporeairshow.com",em:[],p:"Aerospace OEMs, defence officials, airlines",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:3,ed:8,ds:"3–8 Feb",n:"Singapore Airshow 2026",v:"Changi Exhibition Centre",i:"Trade Show / Aerospace & Defence",o:"Experia Events Pte Ltd",c:"",w:"www.singaporeairshow.com",em:[],p:"Government, defence contractors, MRO companies, airlines",no:"Co-located with Space Summit",why:"",tier:"",s:null,st:""},
+  {m:2,sd:2,ed:4,ds:"2–4 Feb",n:"Augmented World Expo (AWE) Singapore",v:"Singapore Expo",i:"Technology Expo / AR, VR, MR",o:"AWE Organizers",c:"",w:"www.awexr.com",em:[],p:"XR professionals, tech investors, developers",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:4,ed:6,ds:"4–6 Feb",n:"Asia Photonics Expo (APE 2026)",v:"Marina Bay Sands",i:"Technology Expo / Photonics & Optics",o:"APE Organizers",c:"",w:"www.asia-photonics-expo.com",em:[],p:"Laser & photonics engineers, researchers, manufacturers",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:25,ed:26,ds:"25–26 Feb",n:"Aviation Festival Asia",v:"Suntec Convention Centre",i:"Conference / Aviation Technology",o:"Aviation Festival Organizers",c:"",w:"www.aviationfestivalasia.com",em:[],p:"2,500+ aviation professionals, 150+ speakers; airline CXOs, tech vendors",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:4,ed:5,ds:"4–5 Mar",n:"DELIVER Asia",v:"Suntec Convention Centre",i:"Conference / E-commerce Logistics",o:"Clarion Events",c:"",w:"www.deliverasia.com",em:[],p:"E-commerce logistics leaders, last-mile tech providers",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:9,ed:11,ds:"9–11 Mar",n:"60th RELC International Conference",v:"SEAMEO Regional Language Centre",i:"Academic / Language & Education",o:"SEAMEO Regional Language Centre",c:"+65 6486 0677",w:"www.sealang.net/relc",em:["relc@seameo.org"],p:"Language teachers, linguists, researchers",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:10,ed:null,ds:"10 Mar",n:"AHICE South East Asia – Hotel Conference",v:"Pan-Pacific Hotel Singapore",i:"Conference / Hospitality & Hotels",o:"AHICE Organizers",c:"",w:"www.ahice.com.au",em:[],p:"Hotel owners, operators, investors, C-suite hospitality leaders",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:12,ed:null,ds:"12 Mar",n:"COMEX / IT Show",v:"Suntec Singapore",i:"Technology Expo / IT & Consumer Electronics",o:"Sphere Exhibits",c:"",w:"www.comex.com.sg",em:[],p:"General public, IT consumers, SME buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:24,ed:26,ds:"24–26 Mar",n:"BuildTech Asia 2026",v:"Singapore Expo",i:"Trade Show / Construction & Building",o:"BuildTech Organizers",c:"",w:"www.buildtechasia.com",em:[],p:"Contractors, developers, building material suppliers",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:24,ed:null,ds:"24 Mar",n:"SPORTEL Asia – Sports Television Convention",v:"Orchard Hotel Singapore",i:"Conference / Sports & Media",o:"SPORTEL Organizers",c:"+377 97 97 66 66",w:"www.sportel.com",em:["info@sportel.com"],p:"Sports broadcasters, rights holders, media buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:25,ed:27,ds:"25–27 Mar",n:"Asia Pacific Maritime (APM)",v:"Marina Bay Sands",i:"Trade Show / Maritime & Shipping",o:"Informa Markets",c:"+65 6411 7700",w:"www.asiapacsificmaritime.com",em:[],p:"Shipowners, shipyard operators, maritime tech vendors",no:"Biennial event",why:"",tier:"",s:null,st:""},
+  {m:3,sd:31,ed:null,ds:"31 Mar – 1 Apr",n:"Digital Construction Asia",v:"Marina Bay Sands",i:"Trade Show / Construction Technology",o:"Digital Construction Organizers",c:"",w:"www.digitalconstructionasia.com",em:[],p:"BIM, IoT, AI-for-construction professionals",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:31,ed:null,ds:"31 Mar – 1 Apr",n:"Drones & Uncrewed Asia",v:"Marina Bay Sands",i:"Trade Show / Drone & UAV Technology",o:"Drones & Uncrewed Organizers",c:"",w:"www.dronesuncrewedasia.com",em:[],p:"Drone operators, defence, logistics, agriculture tech",no:"",why:"",tier:"",s:null,st:""},
+  {m:3,sd:31,ed:null,ds:"31 Mar – 1 Apr",n:"GEO Connect Asia",v:"Marina Bay Sands",i:"Conference / Geospatial Technology",o:"GEO Connect Organizers",c:"",w:"www.geoconnectasia.com",em:[],p:"GIS professionals, urban planners, government agencies",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:9,ed:11,ds:"9–11 Apr",n:"GITEX Asia x AI Everything Singapore 2026",v:"Marina Bay Sands",i:"Technology Expo / Tech & AI",o:"DWTC & KAOUN International",c:"+971 4 389 9800",w:"gitexasia.com",em:[],p:"Tech CEOs, AI startups, government digital leaders, VCs",no:"Major debut of GITEX brand in Singapore",why:"Major debut of GITEX in Singapore. Tech CEOs, AI startups, government digital leaders, VCs",tier:"⭐ HIGH",s:null,st:""},
+  {m:4,sd:10,ed:12,ds:"10–12 Apr",n:"ADEX Singapore – Asia Dive Expo",v:"Suntec Convention Centre",i:"Trade Show / Diving & Marine Sports",o:"ADEX Organizers",c:"",w:"www.adex.com.sg",em:[],p:"Diving industry, marine conservation, watersports brands",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:13,ed:null,ds:"13 Apr",n:"Argus Biofuels and Feedstocks Asia",v:"TBD",i:"Conference / Biofuels & Energy",o:"Argus Media",c:"",w:"www.argusmedia.com",em:[],p:"Energy traders, biofuel producers, policy makers",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:14,ed:15,ds:"14–15 Apr",n:"World Ageing Festival (AAIF)",v:"Marina Bay Sands",i:"Conference / Healthcare & Eldercare",o:"Ageing Asia",c:"+65 6702 4400",w:"www.ageingasia.com",em:["info@ageingasia.com"],p:"8,300+ attendees; eldercare executives, MedTech, investors",no:"17th edition; 200+ exhibitors, 130+ speakers from 40 countries",why:"",tier:"",s:null,st:""},
+  {m:4,sd:14,ed:15,ds:"14–15 Apr",n:"The Meetings Show – Asia Pacific",v:"Marina Bay Sands",i:"Trade Show / MICE & Travel",o:"Meetings Show Organizers",c:"",w:"www.themeetingsshow.com",em:[],p:"MICE planners, event managers, venue operators",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:17,ed:19,ds:"17–19 Apr",n:"IDEM Singapore – International Dental Exhibition",v:"Marina Bay Sands",i:"Trade Show / Dental & Healthcare",o:"IDEM Organizers",c:"+65 6322 2700",w:"www.idem-singapore.com",em:[],p:"Dentists, dental equipment suppliers, lab technicians",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:20,ed:24,ds:"20–24 Apr",n:"Singapore Maritime Week",v:"Suntec Convention Centre",i:"Conference & Exhibition / Maritime",o:"Maritime and Port Authority of Singapore (MPA)",c:"+65 6375 1600",w:"www.singaporemaritimeweek.com.sg",em:[],p:"Shipping executives, port operators, maritime financiers",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:20,ed:24,ds:"20–24 Apr",n:"Beauty Asia 2026",v:"Marina Bay Sands",i:"Trade Show / Cosmetics & Beauty",o:"Beauty Asia Organizers",c:"",w:"www.beautyasia.com.sg",em:[],p:"Cosmetics brands, beauty therapists, retailers",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:21,ed:24,ds:"21–24 Apr",n:"FHA – Food & Hotel Asia / FHA-HoReCa",v:"Singapore Expo",i:"Trade Show / F&B & Hospitality",o:"Informa Markets",c:"+65 6411 7700",w:"www.foodnhotelasia.com",em:[],p:"80,000+ visitors; F&B buyers, hotel operators, chefs",no:"Asia's largest F&B trade show",why:"",tier:"",s:null,st:""},
+  {m:4,sd:21,ed:24,ds:"21–24 Apr",n:"Black Hat Asia",v:"Marina Bay Sands",i:"Security Conference / Cybersecurity",o:"Black Hat / Informa Tech",c:"",w:"www.blackhat.com/asia-26",em:[],p:"CISOs, security researchers, pentesters, government",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:21,ed:24,ds:"21–24 Apr",n:"ProWine Asia",v:"Singapore Expo",i:"Trade Show / Wine & Spirits",o:"Messe Düsseldorf Asia",c:"+65 6332 9620",w:"www.prowineasia.com",em:["info@mda.com.sg"],p:"Wine importers, distributors, sommeliers, hospitality buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:28,ed:null,ds:"28 Apr",n:"Global Security Asia",v:"Marina Bay Sands",i:"Conference / Security & Counter-Terrorism",o:"Global Security Organizers",c:"",w:"www.globalsecurityasia.com",em:[],p:"Security agencies, intelligence, defence vendors",no:"",why:"",tier:"",s:null,st:""},
+  {m:4,sd:28,ed:30,ds:"28–30 Apr",n:"Milipol Asia-Pacific / Milipol TechX",v:"Marina Bay Sands",i:"Trade Show / Homeland Security",o:"Comexposium",c:"+33 1 76 77 11 11",w:"www.milipol.com",em:["contact@milipol.com"],p:"Public safety agencies, law enforcement, security tech vendors",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:4,ed:7,ds:"4–7 May",n:"HR Tech Asia",v:"Suntec Convention Centre",i:"Technology Expo / HR Technology",o:"HR Tech Organizers",c:"",w:"www.hrtechasia.com",em:[],p:"CHROs, HR leaders, HR software vendors",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:5,ed:7,ds:"5–7 May",n:"TMT Finance APAC ⭐",v:"Pan Pacific Singapore, Marina Bay",i:"Conference / Finance & Infrastructure",o:"TMT Finance | Yedda Wang, Editor-in-Chief APAC",c:"",w:"tmtfinance.com/asia",em:[],p:"~350 senior leaders; CEOs of data centres, PE (KKR, Brookfield), bankers (Morgan Stanley, Macquarie), advisors (Linklaters, Baker Botts)",no:"Deal-driven; sponsors host evening dinners. Contact: Yedda Wang (Editor-in-Chief APAC)",why:"~350 senior bankers, PE investors, infra fund MDs. Sponsors routinely host evening dinners",tier:"⭐ HIGH",s:null,st:"⭐"},
+  {m:5,sd:10,ed:14,ds:"10–14 May",n:"TFWA Asia Pacific",v:"Marina Bay Sands",i:"Trade Show / Duty-Free & Travel Retail",o:"TFWA",c:"+33 4 93 65 44 60",w:"www.tfwa.com",em:["info@tfwa.com"],p:"Travel retailers, brand operators, airport concession buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:11,ed:13,ds:"11–13 May",n:"CeMAT Southeast Asia",v:"Singapore Expo",i:"Trade Show / Intralogistics & Supply Chain",o:"Hannover Messe / Deutsche Messe AG",c:"+49 511 89 0",w:"www.cematseasia.com",em:[],p:"Warehouse automation, logistics tech, supply chain operators",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:13,ed:null,ds:"13 May",n:"Logisym Live",v:"Suntec Singapore",i:"Conference / Logistics & Supply Chain",o:"Logisym Organizers",c:"",w:"www.logisym.com",em:[],p:"Supply chain directors, 3PL operators, tech vendors",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:15,ed:16,ds:"15–16 May",n:"IREX – International Real Estate Expo",v:"Marina Bay Sands",i:"Expo / Real Estate & Property",o:"IREX Organizers",c:"",w:"",em:[],p:"Real estate investors, developers, wealth managers",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:18,ed:19,ds:"18–19 May",n:"24th WLF Litigation Summit ⭐",v:"TBD – Singapore",i:"Conference / Legal – Litigation",o:"World Lawyers Forum (WLF)",c:"",w:"worldlawyersforum.org/singapore",em:[],p:"Senior litigators, cybersecurity lawyers, GCs, legal tech vendors, arbitration practitioners",no:"WLF programme explicitly includes networking happy hours, rooftop events and industry nightlife",why:"Senior litigators, GCs. Networking happy hours and rooftop events baked into programme",tier:"⭐ HIGH",s:"host",st:"⭐"},
+  {m:5,sd:19,ed:21,ds:"19–21 May",n:"ATxEnterprise / ATxSG 2026 ⭐",v:"Singapore Expo",i:"Technology Expo / Tech & Digital",o:"IMDA Singapore",c:"+65 6211 0888",w:"asiatechxsg.com",em:[],p:"22,000+ attendees; government ministers, CIOs, AI vendors, telecoms, smart city firms",no:"Government-backed; dozens of side dinners; delegates travel into city after hours",why:"22,000+ attendees. Government-scale event; dozens of side dinners. Delegates head into city after hours",tier:"⭐ HIGH",s:"host",st:"⭐"},
+  {m:5,sd:20,ed:null,ds:"20 May",n:"ALB SE Asia In-House Legal Summit ⭐",v:"Hilton Singapore Orchard",i:"Conference / Legal",o:"Asian Legal Business (Thomson Reuters)",c:"+65 6870 3738",w:"legalbusinessonline.com",em:[],p:"CLOs, General Counsel from MNCs, compliance officers, Magic Circle law firm partners",no:"ALB events end with VIP networking receptions; law firms host client dinners",why:"CLOs, General Counsel. Law firms compete to host client dinners on sidelines",tier:"⭐ HIGH",s:null,st:"⭐"},
+  {m:5,sd:20,ed:null,ds:"20 May",n:"ATxSummit 2026 (By Invitation Only)",v:"Capella Singapore",i:"Summit / Technology & Digital",o:"IMDA Singapore",c:"+65 6211 0888",w:"asiatechxsg.com",em:[],p:"Government ministers, tech CEOs, C-suite by invitation",no:"By invitation only",why:"",tier:"",s:null,st:""},
+  {m:5,sd:20,ed:22,ds:"20–22 May",n:"BroadcastAsia 2026",v:"Singapore Expo",i:"Trade Show / Broadcasting & Media",o:"Informa Markets",c:"+65 6411 7700",w:"www.broadcastasia.com",em:[],p:"Broadcasters, media tech vendors, content creators",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:20,ed:22,ds:"20–22 May",n:"CommunicAsia 2026",v:"Singapore Expo",i:"Trade Show / Communications & Telecom",o:"Informa Markets",c:"+65 6411 7700",w:"www.communicasia.com",em:[],p:"ICT professionals, telcos, network operators",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:20,ed:22,ds:"20–22 May",n:"The AI Summit Singapore 2026",v:"Singapore Expo",i:"Summit / Artificial Intelligence",o:"Informa Markets",c:"+65 6411 7700",w:"www.theaisummit.com/singapore",em:[],p:"AI executives, enterprise tech leaders, government digital leads",no:"Co-located with ATxSG",why:"",tier:"",s:"host",st:""},
+  {m:5,sd:20,ed:null,ds:"20 May",n:"CleanTech Forum Asia",v:"Sheraton Towers Singapore",i:"Forum / Clean Technology",o:"CleanTech Forum Organizers",c:"",w:"www.cleantech.com",em:[],p:"Cleantech investors, sustainability officers, energy executives",no:"",why:"",tier:"",s:null,st:""},
+  {m:5,sd:29,ed:null,ds:"29 May – 1 Jun",n:"Singapore Food Expo",v:"Singapore Expo",i:"Consumer Expo / Food & Beverage",o:"Singapore Food Expo Organizers",c:"",w:"www.singaporefoodexpo.com.sg",em:[],p:"F&B brands, home consumers, food entrepreneurs",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:1,ed:4,ds:"1–4 Jun",n:"World Aquaculture Singapore",v:"Singapore Expo",i:"Conference / Aquaculture & Fisheries",o:"World Aquaculture Society (WAS)",c:"",w:"www.was.org",em:[],p:"Aquaculture scientists, seafood industry, fishery officials",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:7,ed:12,ds:"7–12 Jun",n:"ASME OMAE Conference 2026",v:"Singapore Expo",i:"Academic Conference / Ocean & Offshore Engineering",o:"ASME (American Society of Mechanical Engineers)",c:"",w:"www.asmeconferences.org/omae2026",em:[],p:"900+ technical papers; offshore engineers, naval architects, Arctic researchers",no:"45th edition",why:"",tier:"",s:null,st:""},
+  {m:6,sd:8,ed:14,ds:"8–14 Jun",n:"SuperAI / Singapore AI Week ⭐⭐",v:"Marina Bay Sands",i:"Conference / Artificial Intelligence",o:"SuperAI | Co-Founder: Peter Noszek",c:"",w:"superai.com",em:["ecosystem@superai.com"],p:"10,000+ attendees; AI lab founders, GPU operators, VCs, government AI policy leads, researchers (MIT, DeepMind). Sponsors: OpenAI, Google, AWS, Arm, Bain & Co",no:"7-day AI week; dense ecosystem of sponsor dinners, VC dinners, startup parties. Multiple bookings realistic",why:"10,000+ AI leaders. 7-day ecosystem of sponsor & VC dinners. Analogous to TOKEN2049 Week",tier:"⭐⭐ VERY HIGH",s:"host",st:"⭐⭐"},
+  {m:6,sd:9,ed:10,ds:"9–10 Jun",n:"Identity Week Asia 2026",v:"Suntec Convention Centre",i:"Conference / Identity & Security Technology",o:"Eleven Expo",c:"",w:"www.identityweek.net",em:[],p:"Government ID agencies, biometrics vendors, financial compliance teams",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:9,ed:null,ds:"9 Jun",n:"APAC Energy Assembly",v:"Pan Pacific Singapore",i:"Conference / Energy & Oil & Gas",o:"Energy Council (Asia Pacific)",c:"+65 6990 7356",w:"energycouncil.com",em:[],p:"Energy executives, oil & gas leaders, policy makers",no:"",why:"Closed-door investment forum. 500+ senior leaders, 70+ speakers, 450+ pre-matched 1:1 meetings. Sponsorship contact: Nuriya Powell.",tier:"",s:"dining",st:""},
+  {m:6,sd:14,ed:16,ds:"14–16 Jun",n:"World Cities Summit",v:"Suntec Convention Centre",i:"Conference / Urban Planning & Sustainability",o:"Centre for Liveable Cities (CLC) & Singapore MND",c:"+65 6645 9576",w:"www.worldcitiessummit.com.sg",em:[],p:"City mayors, urban planners, government ministers, real estate developers",no:"10th edition",why:"",tier:"",s:"dining",st:""},
+  {m:6,sd:15,ed:17,ds:"15–17 Jun",n:"EXPO REAL Asia Pacific",v:"Suntec Convention Centre",i:"Real Estate Expo / Property",o:"EXPO REAL Organizers (Messe München)",c:"",w:"www.exporeal.net",em:[],p:"Real estate investors, developers, REITs, fund managers",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:15,ed:19,ds:"15–19 Jun",n:"Singapore International Water Week (SIWW)",v:"Marina Bay Sands",i:"Conference & Exhibition / Water Technology",o:"PUB – Singapore's National Water Agency & Constellar",c:"+65 6731 3200",w:"www.siww.com.sg",em:[],p:"Water utility heads, environment ministers, MNC water tech vendors",no:"",why:"",tier:"",s:"dining",st:""},
+  {m:6,sd:16,ed:17,ds:"16–17 Jun",n:"CPHI South East Asia",v:"Singapore",i:"Trade Show / Pharmaceutical",o:"Informa Markets",c:"+65 6411 7700",w:"cphi.com/southeast-asia",em:["cphi@informa.com"],p:"Pharma manufacturers, API suppliers, biotech companies, CROs, CMOs, regulatory affairs professionals, distributors",no:"Known for private client dinners on sidelines",why:"Pharma manufacturers, biotech, CROs. Private client dinners on sidelines well-known",tier:"⭐ HIGH",s:null,st:""},
+  {m:6,sd:17,ed:18,ds:"17–18 Jun",n:"Mining Asia",v:"Marina Bay Sands",i:"Conference / Mining & Resources",o:"Mining Asia Organizers",c:"",w:"www.miningasia.net",em:[],p:"Mining executives, resource investors, equipment suppliers",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:22,ed:null,ds:"22 Jun",n:"ISARC – Automation & Robotics in Construction",v:"TBD",i:"Symposium / Automation & Robotics",o:"ISARC Organizers",c:"",w:"www.iaarc.org",em:[],p:"Construction automation researchers, robotics engineers",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:22,ed:null,ds:"22 Jun",n:"WHEC – World Hydrogen Energy Conference",v:"TBD",i:"Conference / Hydrogen Energy",o:"WHEC Organizers",c:"",w:"www.iahe.org",em:[],p:"Hydrogen energy researchers, policy makers, industry executives",no:"",why:"",tier:"",s:null,st:""},
+  {m:6,sd:null,ed:null,ds:"Jun",n:"LogiPharma Asia",v:"Singapore",i:"Conference / Pharma Logistics",o:"Reuters Events (Thomson Reuters)",c:"",w:"www.logipharma.com/asia",em:[],p:"VP/Director-level pharma supply chain and logistics leaders, cold chain providers, 3PLs; ~200–400 senior delegates",no:"Smaller curated audience – ideal for private rooms 20–50 pax",why:"",tier:"",s:null,st:""},
+  {m:6,sd:24,ed:25,ds:"24–25 Jun",n:"Asia Healthcare Week",v:"One Farrer Hotel",i:"Conference / Healthcare",o:"Terrapinn",c:"+65 6322 2730",w:"www.terrapinn.com",em:[],p:"Hospital CEOs, CMOs, digital health entrepreneurs, health IT vendors, government health officials, MedTech executives",no:"Delegates seek dinner venues near Farrer Park / Novena area",why:"",tier:"",s:null,st:""},
+  {m:6,sd:26,ed:null,ds:"26 Jun",n:"ICC Asia Pacific Conference on International Arbitration ⭐",v:"Amara Singapore Hotel, 165 Tanjong Pagar Road",i:"Conference / International Arbitration",o:"ICC International Court of Arbitration",c:"",w:"events2go.iccwbo.org",em:[],p:"International arbitrators, dispute resolution partners (Allen & Overy, DLA Piper, White & Case, SIAC), corporate counsel",no:"ICC typically holds formal gala dinner; off-venue dinners deeply embedded in legal culture globally. Pre-conf training Jun 25",why:"International arbitrators, law firm partners. ICC holds formal gala dinner; off-venue dinners standard",tier:"⭐ HIGH",s:null,st:"⭐"},
+  {m:6,sd:29,ed:null,ds:"29 Jun – 2 Jul",n:"ILTM Asia Pacific",v:"Marina Bay Sands",i:"Trade Show / Luxury Travel",o:"RX Singapore (Reed Exhibitions)",c:"",w:"www.iltm.net/asia-pacific",em:[],p:"650 luxury travel suppliers, 650 buyers/advisors; high-net-worth travel planners from APAC",no:"Invitation-only luxury travel market",why:"",tier:"",s:null,st:""},
+  {m:7,sd:1,ed:2,ds:"1–2 Jul",n:"Cell & Gene Therapy World Asia",v:"Marina Bay Sands",i:"Conference / Biopharma & Gene Therapy",o:"Hanson Wade (UK-based)",c:"",w:"www.hansonwade.com",em:["info@hansonwade.com"],p:"Biopharma R&D execs, gene therapy scientists, CMC professionals, biotech VCs, clinical trial site reps",no:"Biotech events at MBS consistently generate off-venue sponsor dinners",why:"",tier:"",s:null,st:""},
+  {m:7,sd:5,ed:6,ds:"5–6 Jul",n:"EduCon Singapore",v:"TBD",i:"Conference / Education Technology",o:"Education Conference Organizers",c:"",w:"",em:[],p:"EdTech innovators, educators, school administrators",no:"",why:"",tier:"",s:null,st:""},
+  {m:7,sd:9,ed:12,ds:"9–12 Jul",n:"Singapore International Jewellery Expo (SIJE)",v:"Marina Bay Sands",i:"Trade Show / Jewellery & Luxury Goods",o:"SIJE Organizers",c:"",w:"www.sijevent.com",em:[],p:"Jewellery manufacturers, luxury retailers, watches & gems buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:7,sd:15,ed:17,ds:"15–17 Jul",n:"SIGEP Asia",v:"Marina Bay Sands",i:"Trade Show / Gelato, Pastry & Coffee",o:"Italian Exhibition Group (IEG)",c:"",w:"www.sigepasia.com",em:[],p:"Gelato/pastry chefs, café chains, food service equipment buyers",no:"",why:"",tier:"",s:null,st:""},
+  {m:7,sd:15,ed:17,ds:"15–17 Jul",n:"Speciality Coffee & Tea Asia",v:"Marina Bay Sands",i:"Trade Show / Coffee & Tea",o:"IEG Asia Pte Ltd (Italian Exhibition Group)",c:"+65 6278 8666",w:"iegasia.com.sg",em:[],p:"Coffee roasters, café owners, tea brands, food & beverage buyers",no:"",why:"Co-located with SIGEP Asia 2026. ~10,000 trade visitors. Includes Singapore National Coffee Championship.",tier:"",s:"dining",st:""},
+  {m:8,sd:26,ed:27,ds:"26–27 Aug",n:"The Business Show Asia",v:"Marina Bay Sands",i:"Trade Show / Entrepreneurship & SME",o:"The Business Show Media SG Pte Ltd",c:"",w:"www.asiabusinessshow.com",em:[],p:"8,000+ SME decision-makers, entrepreneurs, startup investors",no:"",why:"Asia's largest SME/startup event. 8,000+ SME owners, 250+ exhibitors, 150+ seminars.",tier:"",s:"dining",st:""},
+  {m:9,sd:2,ed:4,ds:"2–4 Sep",n:"Seafood Expo Asia",v:"Marina Bay Sands",i:"Trade Show / Seafood & Fisheries",o:"Diversified Communications",c:"",w:"www.seafoodexpoasia.com",em:[],p:"Seafood suppliers, importers, distributors, retailers",no:"",why:"",tier:"",s:"dining",st:""},
+  {m:9,sd:9,ed:11,ds:"9–11 Sep",n:"Medical Fair Asia ⭐",v:"Marina Bay Sands (Sands Expo)",i:"Trade Show / Medical Equipment",o:"Messe Düsseldorf Asia | Linda Tan, Senior Manager",c:"+65 6332 9643",w:"medicalfair-asia.com",em:["lindatan@mda.com.sg"],p:"1,000+ exhibitors from 62+ countries; doctors, hospital directors, MedTech manufacturers, health ministries from ASEAN",no:"One of region's biggest healthcare gatherings; multiple exhibitor-hosted dinners over 3 nights. Key contact: Linda Tan +65 6332 9643",why:"1,000+ exhibitors, 62+ countries. Multiple exhibitor-hosted dinners over 3 nights",tier:"⭐ HIGH",s:"dining",st:"⭐"},
+  {m:9,sd:9,ed:11,ds:"9–11 Sep",n:"Medical Manufacturing Asia",v:"Marina Bay Sands",i:"Trade Show / Medical Manufacturing",o:"Medical Manufacturing Organizers",c:"",w:"www.medmanufacturingasia.com",em:[],p:"Medical device manufacturers, MedTech engineers, procurement managers",no:"Co-located with Medical Fair Asia",why:"",tier:"",s:null,st:""},
+  {m:9,sd:9,ed:11,ds:"9–11 Sep",n:"OS+H Asia – Occupational Safety & Health",v:"Marina Bay Sands",i:"Trade Show / Safety & Health",o:"Messe Düsseldorf Asia",c:"+65 6332 9620",w:"www.oshandhealth.sg",em:["info@mda.com.sg"],p:"Safety officers, workplace health professionals, equipment suppliers",no:"Co-located with Medical Fair Asia",why:"",tier:"",s:null,st:""},
+  {m:9,sd:22,ed:24,ds:"22–24 Sep",n:"MRO Asia-Pacific – Aircraft Maintenance",v:"Singapore Expo",i:"Trade Show / Aviation Maintenance",o:"MRO Asia Pacific Organizers (Aviation Week Network)",c:"",w:"www.mroasiapacific.com",em:[],p:"MRO engineers, airline procurement, aviation tech vendors",no:"",why:"",tier:"",s:null,st:""},
+  {m:9,sd:23,ed:25,ds:"23–25 Sep",n:"SpillAsia – Environmental Protection",v:"Suntec Convention Centre",i:"Conference / Environmental Protection",o:"SpillAsia Organizers",c:"",w:"www.spillasia.com",em:[],p:"Environmental response professionals, marine emergency, port authorities",no:"",why:"",tier:"",s:null,st:""},
+  {m:9,sd:29,ed:30,ds:"29–30 Sep",n:"Tech Week Singapore 2026",v:"TBD",i:"Conference / Cloud, AI & Cybersecurity",o:"CloserStill Media Ltd",c:"",w:"singaporetechnologyweek.com",em:[],p:"CIOs, CTOs, cloud & security vendors, enterprise IT leaders",no:"",why:"5 co-located shows: Cloud & AI Infrastructure, DevOps Live, Cyber Security World, Data Centre World, Big Data & AI World. 29,000+ attendees.",tier:"",s:"dining",st:""},
+  {m:10,sd:5,ed:11,ds:"5–11 Oct (Race Week: 9–11)",n:"TOKEN2049 Singapore ⭐⭐⭐",v:"Marina Bay Sands (all 5 floors)",i:"Conference / Crypto & Web3",o:"TOKEN2049 | Co-Founder: Alexander Fiskum | Head BD: Tracy Thai",c:"",w:"token2049.com/singapore/partners",em:["TOKEN2049SG@wachsman.com"],p:"25,000+ across 160+ countries; crypto exchange CEOs (Binance, Coinbase, OKX), VCs (a16z, Paradigm, Multicoin), Web3 founders, DeFi leaders, institutional crypto adopters",no:"THE single best opportunity on the calendar. 1,000+ side events, parties, VC mixers Oct 5–11. Multiple bookings across different nights at the same venue is realistic. Overlaps with F1 race week",why:"1,000+ side events & parties across full week. 25,000+ delegates. Entire city in entertainment mode. Multiple bookings across different nights from different organisers",tier:"⭐⭐⭐ EXCEPTIONAL",s:"host",st:"⭐⭐⭐"},
+  {m:10,sd:9,ed:11,ds:"9–11 Oct",n:"FORMULA 1 Singapore Grand Prix 2026",v:"Marina Bay Street Circuit",i:"Mega Sporting Event / F1 Racing",o:"Singapore GP Pte Ltd",c:"",w:"singaporegp.sg",em:[],p:"Global VIPs, corporate hospitality, F1 teams, sponsors, 300,000+ spectators",no:"Entire city in entertainment mode during race week",why:"Entire city in entertainment mode; 300,000+ spectators; massive corporate hospitality",tier:"⭐ HIGH",s:"host",st:""},
+  {m:10,sd:7,ed:9,ds:"7–9 Oct",n:"Milken Institute Asia Summit ⭐⭐",v:"Four Seasons Hotel Singapore",i:"Summit / Finance & Leadership",o:"Milken Institute International | SG: Yeen Chee Chong",c:"",w:"milkeninstitute.org/international/asia-pacific",em:[],p:"1,500+ global CEOs, government officials, institutional investors, PE/VC heads, philanthropists, policymakers",no:"One of Asia's most prestigious finance events. Curated private dinners core to programme. F1 race week overlap (entire city in entertainment mode). Past speakers: Jensen Huang, Kristalina Georgieva, Bill Clinton. Supported by STB (MoU 2026–2028)",why:"1,500+ global CEOs, PE heads, government officials. Overlaps F1 race week. Curated private dinners core to format",tier:"⭐⭐ VERY HIGH",s:"host",st:"⭐⭐"},
+  {m:10,sd:21,ed:23,ds:"21–23 Oct",n:"ITB Asia / MICE Show Asia 2026",v:"Marina Bay Sands",i:"Trade Show / Travel & Tourism",o:"Messe Berlin Asia Pacific",c:"+65 6027 7577",w:"www.itb-asia.com",em:["exhibitor@itb-asia.com","conference@itb-asia.com"],p:"18,000+ attendees; 132 countries; corporate travel managers, MICE planners, tourism boards, hotels, airlines, travel tech",no:"Asia's largest B2B travel trade show",why:"",tier:"",s:"host",st:""},
+  {m:10,sd:21,ed:23,ds:"21–23 Oct",n:"ITAP – Industrial Transformation Asia-Pacific",v:"Singapore Expo",i:"Trade Show / Industry 4.0 & Manufacturing",o:"Constellar & Deutsche Messe AG",c:"",w:"www.industrial-transformation.com",em:[],p:"Manufacturing CEOs, plant directors, automation specialists, systems integrators; 70+ countries represented",no:"HANNOVER MESSE event; Oct 2026 edition",why:"",tier:"",s:"host",st:""},
+  {m:10,sd:22,ed:24,ds:"22–24 Oct",n:"Food Japan",v:"Suntec City",i:"Food Expo / Japanese Food Products",o:"Food Japan Executive Committee (c/o OJ Events Pte Ltd)",c:"",w:"www.foodjapan.asia",em:[],p:"Japanese food & beverage brands, Southeast Asian F&B buyers, importers",no:"",why:"Trade days + public day. Backed by Embassy of Japan, MAFF, JETRO. ~7,500 visitors, 194 exhibitors (2024).",tier:"",s:"dining",st:""},
+  {m:10,sd:null,ed:null,ds:"TBC Oct",n:"Cardano Summit 2026",v:"TBD – Singapore",i:"Conference / Blockchain",o:"Cardano Foundation",c:"",w:"cardanosummit.io",em:[],p:"Cardano developers, blockchain validators, DeFi developers, institutional blockchain adopters",no:"Likely overlaps TOKEN2049 Week, multiplying the opportunity",why:"Likely overlaps TOKEN2049 Week; blockchain ecosystem dinners standard",tier:"⭐ HIGH",s:"host",st:""},
+  {m:11,sd:18,ed:20,ds:"18–20 Nov",n:"Singapore FinTech Festival (SFF) 2026 ⭐⭐",v:"Singapore Expo",i:"Festival & Conference / FinTech",o:"MAS / Elevandi / Constellar",c:"",w:"fintechfestival.sg",em:[],p:"65,000+ from 150+ countries; central bank governors, global bank CEOs (DBS, JPMorgan, HSBC), fintech unicorn founders, payments companies (Visa, Mastercard, Grab), government ministers, VCs",no:"Hundreds of side events, dinners, receptions each evening of festival week. Treat as full-week block. Multiple simultaneous dinner events nightly",why:"65,000+ from 150 countries. Hundreds of side events nightly. Full-week block opportunity",tier:"⭐⭐ VERY HIGH",s:"host",st:"⭐⭐"},
+  {m:11,sd:null,ed:null,ds:"TBC Nov",n:"EduTech Asia",v:"Marina Bay Sands",i:"Conference / Education Technology",o:"Informa Markets",c:"+65 6411 7700",w:"www.edutechasia.com",em:[],p:"EdTech founders, school leaders, government education officials",no:"",why:"",tier:"",s:null,st:""},
+  {m:11,sd:24,ed:26,ds:"24–26 Nov",n:"OSEA – Offshore Energy Week",v:"Marina Bay Sands",i:"Conference / Offshore Energy",o:"OSEA Organizers (Constellar)",c:"",w:"www.osea-asia.com",em:[],p:"Offshore oil & gas executives, energy decarbonisation leads, marine engineers",no:"Biennial event",why:"",tier:"",s:"host",st:""},
+  {m:11,sd:29,ed:30,ds:"29–30 Nov",n:"BLACKPINK Concert – K-pop Legends",v:"National Stadium",i:"Concert / K-pop",o:"Live Nation Singapore",c:"",w:"livenation.sg",em:[],p:"K-pop fans, youth",no:"",why:"NOTE: original BLACKPINK Singapore concert ran 28-30 Nov 2025 (DEADLINE tour). 2026 listing may be stale. Verify before relying on it.",tier:"",s:"dining",st:""},
+  {m:12,sd:10,ed:11,ds:"10–11 Dec",n:"Asia-Pacific Conference on Economics & Finance (APEF)",v:"Holiday Inn Singapore Atrium",i:"Academic Conference / Economics & Finance",o:"East Asia Research Pte Ltd",c:"",w:"apef.ear.com.sg",em:[],p:"Economists, finance academics, central bank researchers, quantitative finance practitioners",no:"10th edition; academic-industry hybrid",why:"10th edition. Founded by Anthony Tan. Selected papers published by Springer Nature.",tier:"",s:"host",st:""}
 ];
 
 function parseDateStr(m, d, isStart) {
@@ -469,11 +503,37 @@ function parseDateStr(m, d, isStart) {
   return `2026-${String(mi + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-const SG_EVENTS = SG_EVENTS_RAW.map((e, i) => ({
-  id: `sg-${i}`, name: e.n, month: MONTH_SHORT.indexOf(e.m), dateStr: e.d,
-  venue: e.v, type: e.t, layer: "sg",
-  start: parseDateStr(e.m, e.d, true), end: parseDateStr(e.m, e.d, false),
-}));
+// Singapore Events Master v2 + Priority Quick-Reference (merged).
+// Schema: m=1-12, sd/ed=days, ds=date string, n=name, v=venue, i=industry,
+//   o=organiser/contact, c=phone, w=website, em=emails[], p=participants,
+//   no=event-list notes, why=priority "why it matters" rationale, tier=⭐ rating,
+//   s=sales priority ('host' yellow / 'dining' orange / null), st=star markers in name.
+const SG_EVENTS = SG_EVENTS_RAW.map((e, i) => {
+  const sd = e.sd || 1;
+  const ed = e.ed || sd;
+  return {
+    id: `sg-${i}`,
+    name: e.n,
+    month: e.m - 1,
+    dateStr: e.ds,
+    venue: e.v,
+    type: e.i,
+    industry: e.i,
+    organiser: e.o,
+    contact: e.c,
+    website: e.w,
+    emails: e.em || [],
+    participants: e.p,
+    notes: e.no,
+    why: e.why,
+    tier: e.tier,
+    sales: e.s,
+    star: e.st,
+    layer: "sg",
+    start: `2026-${String(e.m).padStart(2, "0")}-${String(sd).padStart(2, "0")}`,
+    end: `2026-${String(e.m).padStart(2, "0")}-${String(ed).padStart(2, "0")}`,
+  };
+});
 
 const VISITOR_DATA = [
   {market:"Mainland China",arrivals:"3.1M +3%",data:{Jan:"Mod",Feb:"Peak",Mar:"Mod",Apr:"Low",May:"Low",Jun:"Mod",Jul:"Mod",Aug:"Mod",Sep:"Low",Oct:"Peak",Nov:"High",Dec:"Mod"}},
@@ -669,6 +729,27 @@ const SEED_VENUE_EVENTS = [
   {id:"vn-at-33",name:"Halloween — Murder Mystery Dinner",venue:"atico",subBrand:"LOUNGE",start:"2026-10-31",end:"2026-10-31",hook:"Halloween",layer:"venue"},
 ];
 
+// ─── DATE NUMBER COLOUR CODES (overlay on day numerals) ───
+// Sourced from font colours on day numbers in 1-HOST v14 file.
+//   GREEN dot  = double-digit dates (1/1, 2/2 … 12/12 — promo-ready)
+//   PURPLE dot = conference dates (major MICE conference periods)
+const CONFERENCE_DATES = new Set([
+  "2026-05-19","2026-05-20","2026-05-21","2026-05-22",
+  "2026-06-08","2026-06-09","2026-06-10","2026-06-11","2026-06-12","2026-06-13","2026-06-14",
+  "2026-09-29","2026-09-30",
+  "2026-10-05","2026-10-06","2026-10-07","2026-10-08","2026-10-09","2026-10-11",
+  "2026-10-21","2026-10-22","2026-10-23",
+]);
+const DOUBLE_DIGIT_DATES = new Set([
+  "2026-01-01","2026-02-02","2026-03-03","2026-04-04","2026-05-05","2026-06-06",
+  "2026-07-07","2026-08-08","2026-09-09","2026-10-10","2026-11-11","2026-12-12",
+]);
+
+const DATE_CODE_COLORS = {
+  doubledigit: "#16A34A", // green
+  conference:  "#7C3AED", // purple
+};
+
 // ─── COLOURS ───
 
 const LAYER_COLORS = {
@@ -683,6 +764,15 @@ const LAYER_COLORS = {
   ph: { primary: "#EAB308", bg: "#FEF9C3", text: "#000" },
   campaign: { primary: "#EC4899", bg: "#FCE7F3", text: "#fff" },
   venue: { primary: "#0891B2", bg: "#CFFAFE", text: "#fff" },
+  // Sales-priority accents (override base colour on event chip / detail panel)
+  host: { primary: "#CA8A04", bg: "#FEF9C3", text: "#000", label: "1-Host Sales" },
+  dining: { primary: "#EA580C", bg: "#FFEDD5", text: "#fff", label: "Dining Sales" },
+};
+
+// Square markers shown next to day number when an event with a sales-priority flag falls on that date
+const SALES_SQUARE_COLORS = {
+  host: "#FACC15",   // yellow
+  dining: "#F97316", // orange
 };
 
 const INTENSITY_COLORS = { Peak: "#059669", High: "#10B981", Mod: "#6EE7B7", Low: "#D1FAE5" };
@@ -719,6 +809,7 @@ export default function MarketingCalendar() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [showStats, setShowStats] = useState(false);
   const [showVisitors, setShowVisitors] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
   const [selectedZone, setSelectedZone] = useState("group"); // "group" or a venue key
   const [selectedExportPeriod, setSelectedExportPeriod] = useState("Annual"); // "Annual" or month name (January..December)
   const [user, setUser] = useState(null); // { email?, role, name, dept, venue? }
@@ -902,7 +993,18 @@ export default function MarketingCalendar() {
     }
     if (search) {
       const s = search.toLowerCase();
-      evts = evts.filter(e => e.name?.toLowerCase().includes(s) || e.cat?.toLowerCase().includes(s) || e.type?.toLowerCase().includes(s));
+      evts = evts.filter(e =>
+        e.name?.toLowerCase().includes(s) ||
+        e.cat?.toLowerCase().includes(s) ||
+        e.type?.toLowerCase().includes(s) ||
+        e.industry?.toLowerCase().includes(s) ||
+        e.organiser?.toLowerCase().includes(s) ||
+        e.venue?.toLowerCase().includes(s) ||
+        e.participants?.toLowerCase().includes(s) ||
+        e.notes?.toLowerCase().includes(s) ||
+        e.why?.toLowerCase().includes(s) ||
+        (e.emails && e.emails.join(" ").toLowerCase().includes(s))
+      );
     }
     if (quarter !== "all") {
       const months = QUARTERS[quarter];
@@ -1751,6 +1853,9 @@ export default function MarketingCalendar() {
             <button onClick={() => setShowVisitors(!showVisitors)} className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border ${t.chipInactiveBorder} ${t.borderHoverStrong}`}>
               <Users className="w-3 h-3" /> Visitor Map
             </button>
+            <button onClick={() => setShowLegend(!showLegend)} className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${showLegend ? "border-indigo-500 bg-indigo-50" : `${t.chipInactiveBorder} ${t.borderHoverStrong}`}`}>
+              <FileText className={`w-3 h-3 ${showLegend ? "text-indigo-700" : ""}`} /> <span className={showLegend ? "text-indigo-700 font-medium" : ""}>Legend</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1789,6 +1894,124 @@ export default function MarketingCalendar() {
           )}
         </div>
       </div>
+
+      {showLegend && (
+        <div className={`mx-4 mt-3 p-4 ${t.panel} border rounded-lg space-y-4`}>
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-bold ${t.textHead} flex items-center gap-2`}><FileText className="w-4 h-4" /> Calendar Index</h3>
+            <button onClick={() => setShowLegend(false)} className={`p-1 rounded ${t.surfaceHover}`} title="Close legend"><X className="w-4 h-4" /></button>
+          </div>
+
+          {/* Day-number markers — the four new dots/squares */}
+          <div>
+            <h4 className={`text-xs font-bold uppercase tracking-wide ${t.textMuted} mb-2`}>Markers next to day numbers</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="flex items-start gap-2.5">
+                <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+                  <span className={`text-xs font-medium ${t.textBody}`}>15</span>
+                  <span className="rounded-full" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.doubledigit, boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} />
+                </div>
+                <div>
+                  <div className="text-xs font-medium" style={{ color: DATE_CODE_COLORS.doubledigit }}>Green dot — Double-digit date</div>
+                  <div className={`text-xs ${t.textDim}`}>1/1, 2/2 … 12/12. Promo-ready anchor dates (e.g. "11.11", "12.12 sale").</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+                  <span className={`text-xs font-medium ${t.textBody}`}>15</span>
+                  <span className="rounded-full" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.conference, boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} />
+                </div>
+                <div>
+                  <div className="text-xs font-medium" style={{ color: DATE_CODE_COLORS.conference }}>Purple dot — Conference date</div>
+                  <div className={`text-xs ${t.textDim}`}>22 dates spanning the major MICE periods (e.g. ATX SG, Tech Week, F1/Milken/TOKEN2049 week, ITB Asia).</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+                  <span className={`text-xs font-medium ${t.textBody}`}>15</span>
+                  <span className="rounded-sm" style={{ width: "10px", height: "10px", background: SALES_SQUARE_COLORS.host, boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }} />
+                </div>
+                <div>
+                  <div className="text-xs font-medium" style={{ color: "#A16207" }}>Yellow square — Host Sales priority</div>
+                  <div className={`text-xs ${t.textDim}`}>A 1-Host event-sales-priority conference falls on this date. Likely to drive event-booking enquiries — pursue actively.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+                  <span className={`text-xs font-medium ${t.textBody}`}>15</span>
+                  <span className="rounded-sm" style={{ width: "10px", height: "10px", background: SALES_SQUARE_COLORS.dining, boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }} />
+                </div>
+                <div>
+                  <div className="text-xs font-medium" style={{ color: "#C2410C" }}>Orange square — Dining Sales priority</div>
+                  <div className={`text-xs ${t.textDim}`}>An event predicted to drive big-group dining bookings. Prep ops capacity.</div>
+                </div>
+              </div>
+            </div>
+            <div className={`text-xs ${t.textDim} italic mt-2`}>Click a day to see which event(s) trigger the markers and read the full priority briefing.</div>
+          </div>
+
+          {/* Cell background — Hot/Cold rating */}
+          <div className={`pt-3 border-t ${t.border}`}>
+            <h4 className={`text-xs font-bold uppercase tracking-wide ${t.textMuted} mb-2`}>Day-cell background colour — 1-Host event demand</h4>
+            <div className={`text-xs ${t.textDim} mb-2`}>Reflects confirmed 1-Host events in Tripleseat for that date — i.e. event-sales volume, not dining covers.</div>
+            <div className="flex flex-wrap gap-3">
+              {[["hot-hot","Hot-Hot — saturated, many confirmed events"], ["hot","Hot — strong demand"], ["cold","Cold — light demand"], ["cold-cold","Cold-Cold — open availability, actively pursue"]].map(([r,desc]) => (
+                <div key={r} className="flex items-center gap-1.5">
+                  <div className="w-4 h-4 rounded-sm" style={{ background: LAYER_COLORS[r].primary }} />
+                  <span className={`text-xs ${t.textBody}`} title={desc}>{LAYER_COLORS[r].label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Day-cell icons */}
+          <div className={`pt-3 border-t ${t.border}`}>
+            <h4 className={`text-xs font-bold uppercase tracking-wide ${t.textMuted} mb-2`}>Other day-cell icons</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="flex items-center gap-2">
+                <Star className="w-3.5 h-3.5 text-amber-500 fill-current shrink-0" />
+                <span className={`text-xs ${t.textBody}`}>Public Holiday (yellow border + name shown in cell)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                <span className={`text-xs ${t.textBody}`}>Singapore school break (teal border)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Flame className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <span className={`text-xs ${t.textBody}`}>Hot or Hot-Hot demand day</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Snowflake className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className={`text-xs ${t.textBody}`}>Cold or Cold-Cold demand day</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-3.5 h-3.5 shrink-0" style={{ color: LAYER_COLORS.host.primary }} />
+                <span className={`text-xs ${t.textBody}`}>Inside an event chip — Host-priority event</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Utensils className="w-3.5 h-3.5 shrink-0" style={{ color: LAYER_COLORS.dining.primary }} />
+                <span className={`text-xs ${t.textBody}`}>Inside an event chip — Dining-priority event</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tier badges */}
+          <div className={`pt-3 border-t ${t.border}`}>
+            <h4 className={`text-xs font-bold uppercase tracking-wide ${t.textMuted} mb-2`}>Priority tier (in event detail panel + chip)</h4>
+            <div className={`text-xs ${t.textDim} mb-2`}>Sourced from the Singapore 2026 Events Master "Priority Quick-Reference" sheet — 14 events flagged.</div>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-1.5"><span className="text-amber-700 font-semibold">⭐⭐⭐</span><span className={`text-xs ${t.textBody}`}>Exceptional (full-week city impact)</span></div>
+              <div className="flex items-center gap-1.5"><span className="text-amber-700 font-semibold">⭐⭐</span><span className={`text-xs ${t.textBody}`}>Very High (multi-night side events)</span></div>
+              <div className="flex items-center gap-1.5"><span className="text-amber-700 font-semibold">⭐</span><span className={`text-xs ${t.textBody}`}>High (single major night/dinner)</span></div>
+            </div>
+          </div>
+
+          <div className={`pt-3 border-t ${t.border} text-xs ${t.textDim} flex items-center gap-2`}>
+            <Calendar className="w-3 h-3" />
+            Numbers in cells = <span className={`${t.textHead} font-medium`}>1-Host events confirmed in Tripleseat</span> for that date.
+          </div>
+        </div>
+      )}
 
       {showStats && (
         <div className={`mx-4 mt-3 p-3 ${t.panel} border rounded-lg grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-center`}>
@@ -1960,18 +2183,27 @@ function BoardView({ t, activeHC, activeVenue, eventsByMonth, layers, quarter, o
 
 function EventChip({ t, event, onClick }) {
   const layer = event.layer || "sg";
-  const color = LAYER_COLORS[layer] || LAYER_COLORS.sg;
-  const isStarred = event.name?.includes("⭐");
+  const baseColor = LAYER_COLORS[layer] || LAYER_COLORS.sg;
+  const accent = event.sales === "host" ? LAYER_COLORS.host
+                : event.sales === "dining" ? LAYER_COLORS.dining
+                : baseColor;
+  const isStarred = event.name?.includes("⭐") || (event.star && event.star.includes("⭐"));
   const isDay = t?.name === "day";
-  const chipBg = isDay ? color.bg : color.bg + "40";
+  const chipBg = isDay ? baseColor.bg : baseColor.bg + "40";
+  const tierShort = event.tier ? event.tier.match(/⭐+/)?.[0] : null;
   return (
-    <button onClick={onClick} className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md hover:brightness-110 transition-all group" style={{ background: chipBg, borderLeft: `3px solid ${color.primary}` }}>
+    <button onClick={onClick} className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md hover:brightness-110 transition-all group" style={{ background: chipBg, borderLeft: `3px solid ${accent.primary}` }}>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate" style={{ color: isStarred ? (isDay ? "#B45309" : "#FBBF24") : color.primary }} title={event.name}>{event.name}</div>
+        <div className="flex items-center gap-1">
+          {event.sales === "host" && <Briefcase className="w-3 h-3 shrink-0" style={{ color: LAYER_COLORS.host.primary }} />}
+          {event.sales === "dining" && <Utensils className="w-3 h-3 shrink-0" style={{ color: LAYER_COLORS.dining.primary }} />}
+          <div className="text-xs font-medium truncate" style={{ color: isStarred ? (isDay ? "#B45309" : "#FBBF24") : accent.primary }} title={event.name}>{event.name}</div>
+          {tierShort && <span className="text-xs shrink-0" title={event.tier} style={{ color: "#B45309" }}>{tierShort}</span>}
+        </div>
         {event.dateStr && <div className={`text-xs ${t?.textDim || "text-gray-500"}`}>{event.dateStr}</div>}
         {event.start && !event.dateStr && <div className={`text-xs ${t?.textDim || "text-gray-500"}`}>{event.start.slice(5)}</div>}
       </div>
-      <div className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: color.primary, color: color.text }}>
+      <div className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: baseColor.primary, color: baseColor.text }}>
         {layer === "mice" ? "MICE" : layer === "sg" ? event.type?.split("/")[0]?.slice(0, 8) || "Event" : layer === "campaign" ? "1-GRP" : layer}
       </div>
     </button>
@@ -2122,7 +2354,15 @@ function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
                 }
               }}>
               <div className="flex items-center justify-between mb-0.5">
-                <span className={`text-xs font-medium ${ph ? (isDay ? "text-amber-700" : "text-yellow-400") : t.textMuted}`}>{d}</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className={`text-xs font-medium ${ph ? (isDay ? "text-amber-700" : "text-yellow-400") : t.textMuted}`}>{d}</span>
+                  {/* Date-code dots — large and distinct, sit right next to day number */}
+                  {DOUBLE_DIGIT_DATES.has(key) && <span className="rounded-full shrink-0" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.doubledigit, boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} title="Double-digit date — promo-ready" />}
+                  {CONFERENCE_DATES.has(key) && <span className="rounded-full shrink-0" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.conference, boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} title="Major conference date" />}
+                  {/* Sales-priority squares — yellow = 1-Host events sales, orange = Dining big-group */}
+                  {evts.some(e => e.sales === "host") && <span className="rounded-sm shrink-0" style={{ width: "10px", height: "10px", background: SALES_SQUARE_COLORS.host, boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }} title="1-Host Event Sales priority on this date" />}
+                  {evts.some(e => e.sales === "dining") && <span className="rounded-sm shrink-0" style={{ width: "10px", height: "10px", background: SALES_SQUARE_COLORS.dining, boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }} title="Dining Sales (big-group) priority on this date" />}
+                </div>
                 <div className="flex gap-0.5">
                   {ph && layers.school && <Star className={`w-2.5 h-2.5 ${isDay ? "text-amber-500" : "text-yellow-400"} fill-current`} />}
                   {layers.hotcold && hc && (hc.rating === "hot-hot" || hc.rating === "hot") && <Flame className="w-2.5 h-2.5" style={{ color: LAYER_COLORS[hc.rating].primary }} />}
@@ -2140,7 +2380,7 @@ function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
                 </div>
               )}
               {layers.hotcold && hc && hc.count > 0 && (
-                <div className="text-xs mb-0.5" style={{ color: LAYER_COLORS[hc.rating].primary, fontSize: "10px" }}>{hc.count} events</div>
+                <div className="text-xs mb-0.5" style={{ color: LAYER_COLORS[hc.rating].primary, fontSize: "10px" }} title="1-Host events confirmed in Tripleseat">{hc.count} 1-Host {hc.count === 1 ? "event" : "events"}</div>
               )}
               <div className="space-y-0.5">
                 {evts.slice(0, 2).map(e => {
@@ -2208,6 +2448,8 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
                     const sh = isSchoolHoliday(key);
                     const bg = hc ? LAYER_COLORS[hc.rating]?.primary || t.emptyCell : t.emptyCell;
                     const ratingLabel = hc ? LAYER_COLORS[hc.rating]?.label : "—";
+                    const isDD = DOUBLE_DIGIT_DATES.has(key);
+                    const isConf = CONFERENCE_DATES.has(key);
                     return (
                       <div key={mi} className="h-6 rounded-sm relative group cursor-pointer flex items-center justify-center"
                         style={{ background: layers.hotcold ? bg : t.emptyCell, border: ph && layers.school ? "2px solid #EAB308" : sh && layers.school ? "2px solid #14B8A6" : "1px solid transparent" }}
@@ -2228,10 +2470,19 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
                         }}>
                         {ph && layers.school && <Star className="w-2 h-2 text-yellow-400 fill-yellow-400" />}
                         {hc && hc.count > 0 && <span className="text-xs font-bold" style={{ fontSize: "9px", color: hc ? "#ffffffE6" : undefined }}>{hc.count}</span>}
+                        {/* Date-code dots stacked top-left (5px wide) */}
+                        {(isDD || isConf) && (
+                          <span className="absolute top-0 left-0 flex gap-0.5 m-0.5">
+                            {isDD && <span className="rounded-full" style={{ width: "5px", height: "5px", background: DATE_CODE_COLORS.doubledigit }} />}
+                            {isConf && <span className="rounded-full" style={{ width: "5px", height: "5px", background: DATE_CODE_COLORS.conference }} />}
+                          </span>
+                        )}
                         <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-1 ${t.tooltipBg} border rounded px-2 py-1 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity shadow-xl`}>
                           <div className="font-bold">{MONTH_SHORT[mi]} {d}, 2026</div>
                           <div className={t.textMuted}>{venue.shortName}</div>
-                          <div style={{ color: LAYER_COLORS[hc?.rating]?.primary || (isDay ? "#64748b" : "#888") }}>{ratingLabel} · {hc?.count || 0} events</div>
+                          <div style={{ color: LAYER_COLORS[hc?.rating]?.primary || (isDay ? "#64748b" : "#888") }}>{ratingLabel} · {hc?.count || 0} 1-Host event{hc?.count === 1 ? "" : "s"}</div>
+                          {isDD && <div style={{ color: DATE_CODE_COLORS.doubledigit }}>● Double-digit date</div>}
+                          {isConf && <div style={{ color: DATE_CODE_COLORS.conference }}>● Conference date</div>}
                           {ph && <div className={isDay ? "text-amber-700" : "text-yellow-400"}>⭐ {ph.name}</div>}
                           {sh && <div className={isDay ? "text-teal-700" : "text-teal-400"}>🎓 School Holiday</div>}
                         </div>
@@ -2260,8 +2511,24 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
             <div className="w-4 h-4 rounded-sm border border-teal-400" />
             <span className={`text-xs ${t.textMuted}`}>School Holiday</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.doubledigit, boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} />
+            <span className="text-xs" style={{ color: DATE_CODE_COLORS.doubledigit }} title="1/1, 2/2 … 12/12 — promo-ready">Double-Digit Date</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.conference, boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} />
+            <span className="text-xs" style={{ color: DATE_CODE_COLORS.conference }} title="Major MICE conference period">Conference Date</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-sm" style={{ width: "10px", height: "10px", background: SALES_SQUARE_COLORS.host, boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }} />
+            <span className="text-xs" style={{ color: "#A16207" }} title="Conferences likely to drive event-booking enquiries">Host Sales Priority</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-sm" style={{ width: "10px", height: "10px", background: SALES_SQUARE_COLORS.dining, boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }} />
+            <span className="text-xs" style={{ color: "#C2410C" }} title="Conferences predicted to drive big-group dining bookings">Dining Sales Priority</span>
+          </div>
           <div className={`ml-auto text-xs ${t.textDim}`}>
-            Numbers show <span className={`${t.textHead} font-medium`}>definite bookings</span> per day
+            Numbers show <span className={`${t.textHead} font-medium`}>1-Host events</span> per day (Tripleseat)
           </div>
         </div>
       </div>
@@ -2383,6 +2650,34 @@ function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit,
             </div>
           )}
 
+          {/* Priority tier banner — if event has a ⭐ tier from the Quick-Reference sheet */}
+          {item.tier && !isDateAnchor && (
+            <div className={`rounded-lg p-2.5 border ${isDay ? "bg-amber-50 border-amber-300" : "bg-amber-950/40 border-amber-700/60"}`}>
+              <div className={`text-xs font-bold ${isDay ? "text-amber-900" : "text-amber-300"}`}>{item.tier}</div>
+              <div className={`text-xs ${isDay ? "text-amber-700" : "text-amber-400/80"}`}>From 1-Group Priority Quick-Reference</div>
+            </div>
+          )}
+
+          {/* Sales priority banner */}
+          {item.sales && !isDateAnchor && (
+            <div className="rounded-lg p-2.5 flex items-center gap-2 border" style={{
+              background: LAYER_COLORS[item.sales].primary + "15",
+              borderColor: LAYER_COLORS[item.sales].primary + "55",
+            }}>
+              {item.sales === "host" ? <Briefcase className="w-4 h-4 shrink-0" style={{ color: LAYER_COLORS.host.primary }} /> : <Utensils className="w-4 h-4 shrink-0" style={{ color: LAYER_COLORS.dining.primary }} />}
+              <div>
+                <div className="text-xs font-bold" style={{ color: LAYER_COLORS[item.sales].primary }}>
+                  {item.sales === "host" ? "1-HOST EVENT SALES PRIORITY" : "DINING SALES PRIORITY"}
+                </div>
+                <div className={`text-xs ${t.textMuted}`}>
+                  {item.sales === "host"
+                    ? "Likely to drive event-booking enquiries — pursue actively"
+                    : "Likely to drive big-group dining bookings — prep ops"}
+                </div>
+              </div>
+            </div>
+          )}
+
           {!isDateAnchor && (
             <div className="space-y-2 text-sm">
               {item.start && <div className="flex justify-between"><span className={t.textDim}>Dates</span><span className={t.textBody}>{item.start}{item.end && item.end !== item.start ? ` → ${item.end}` : ""}</span></div>}
@@ -2391,7 +2686,8 @@ function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit,
               {item.subBrand && <div className="flex justify-between"><span className={t.textDim}>Sub-brand</span><span className={`text-right ${t.textBody}`}>{item.subBrand}</span></div>}
               {item.hook && <div className="flex justify-between"><span className={t.textDim}>Anchor</span><span className={`text-right ${t.textBody}`}>{item.hook}</span></div>}
               {item.undated && <div className="flex justify-between"><span className={t.textDim}>Timing</span><span className={`text-right italic ${t.textDim}`}>Month-wide (no specific date)</span></div>}
-              {item.type && <div className="flex justify-between"><span className={t.textDim}>Type</span><span className={t.textBody}>{item.type}</span></div>}
+              {item.industry && <div className="flex justify-between gap-2"><span className={`${t.textDim} shrink-0`}>Industry / Type</span><span className={`text-right ${t.textBody}`}>{item.industry}</span></div>}
+              {!item.industry && item.type && <div className="flex justify-between"><span className={t.textDim}>Type</span><span className={t.textBody}>{item.type}</span></div>}
               {item.cat && <div className="flex justify-between"><span className={t.textDim}>Category</span><span className={`text-right ${t.textBody}`}>{item.cat}</span></div>}
               <div className="flex justify-between"><span className={t.textDim}>Layer</span>
                 <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: color.primary, color: color.text }}>
@@ -2401,6 +2697,90 @@ function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit,
             </div>
           )}
 
+          {/* "Why it matters" — strategic rationale from Priority Quick-Reference */}
+          {!isDateAnchor && item.why && (
+            <div className="rounded-lg p-3 border" style={{ background: isDay ? "#FEF3C7" : "rgba(146,64,14,0.15)", borderColor: isDay ? "#FCD34D" : "#92400E" }}>
+              <h4 className="text-xs font-bold mb-1 uppercase tracking-wide" style={{ color: isDay ? "#92400E" : "#FCD34D" }}>Why it matters</h4>
+              <p className={`text-sm ${t.textBody}`}>{item.why}</p>
+            </div>
+          )}
+
+          {/* Organiser block */}
+          {!isDateAnchor && (item.organiser || item.contact || item.website || (item.emails && item.emails.length > 0)) && (
+            <div className={`${t.surface} rounded-lg p-3 space-y-2`}>
+              <h4 className={`text-xs font-bold ${t.textMuted} uppercase tracking-wide`}>Organiser</h4>
+              {item.organiser && (
+                <div className="flex gap-2 text-sm"><Briefcase className={`w-3.5 h-3.5 ${t.textDim} shrink-0 mt-0.5`} /><span className={t.textBody}>{item.organiser}</span></div>
+              )}
+              {item.contact && (
+                <div className="flex gap-2 text-sm"><Phone className={`w-3.5 h-3.5 ${t.textDim} shrink-0 mt-0.5`} />
+                  <a href={`tel:${item.contact.replace(/\s+/g, "")}`} className={isDay ? "text-blue-700 hover:underline" : "text-blue-400 hover:text-blue-300"}>{item.contact}</a>
+                </div>
+              )}
+              {item.emails && item.emails.length > 0 && item.emails.map((em, i) => (
+                <div key={i} className="flex gap-2 text-sm"><Mail className={`w-3.5 h-3.5 ${t.textDim} shrink-0 mt-0.5`} />
+                  <a href={`mailto:${em}`} className={`break-all ${isDay ? "text-blue-700 hover:underline" : "text-blue-400 hover:text-blue-300"}`}>{em}</a>
+                </div>
+              ))}
+              {item.website && (
+                <div className="flex gap-2 text-sm"><Globe className={`w-3.5 h-3.5 ${t.textDim} shrink-0 mt-0.5`} />
+                  <a href={item.website.startsWith("http") ? item.website : `https://${item.website}`} target="_blank" rel="noopener noreferrer" className={`break-all flex items-center gap-1 ${isDay ? "text-blue-700 hover:underline" : "text-blue-400 hover:text-blue-300"}`}>
+                    {item.website}<ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Audience block */}
+          {!isDateAnchor && item.participants && (
+            <div className={`${t.surface} rounded-lg p-3`}>
+              <h4 className={`text-xs font-bold ${t.textMuted} uppercase tracking-wide mb-1`}>Key Participants / Audience</h4>
+              <p className={`text-sm ${t.textBody}`}>{item.participants}</p>
+            </div>
+          )}
+
+          {/* Notes block */}
+          {!isDateAnchor && item.notes && (
+            <div className={`${t.surface} rounded-lg p-3`}>
+              <h4 className={`text-xs font-bold ${t.textMuted} uppercase tracking-wide mb-1 flex items-center gap-1`}>
+                <FileText className="w-3 h-3" /> Notes
+              </h4>
+              <p className={`text-sm ${t.textBody} whitespace-pre-wrap`}>{item.notes}</p>
+            </div>
+          )}
+
+          {/* Date code badge — when day falls on a coded date */}
+          {(() => {
+            const d = item._clickDate || item.start;
+            if (!d) return null;
+            const isDD = DOUBLE_DIGIT_DATES.has(d);
+            const isConf = CONFERENCE_DATES.has(d);
+            if (!isDD && !isConf) return null;
+            return (
+              <div className="space-y-1">
+                {isDD && (
+                  <div className="rounded-lg p-2.5 border flex items-center gap-2" style={{ background: DATE_CODE_COLORS.doubledigit + "15", borderColor: DATE_CODE_COLORS.doubledigit + "55" }}>
+                    <span className="rounded-full shrink-0" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.doubledigit }} />
+                    <div>
+                      <div className="text-xs font-bold" style={{ color: DATE_CODE_COLORS.doubledigit }}>Double-Digit Date</div>
+                      <div className={`text-xs ${t.textMuted}`}>1/1, 2/2 … 12/12 — natural promotional anchor</div>
+                    </div>
+                  </div>
+                )}
+                {isConf && (
+                  <div className="rounded-lg p-2.5 border flex items-center gap-2" style={{ background: DATE_CODE_COLORS.conference + "15", borderColor: DATE_CODE_COLORS.conference + "55" }}>
+                    <span className="rounded-full shrink-0" style={{ width: "10px", height: "10px", background: DATE_CODE_COLORS.conference }} />
+                    <div>
+                      <div className="text-xs font-bold" style={{ color: DATE_CODE_COLORS.conference }}>Major Conference Date</div>
+                      <div className={`text-xs ${t.textMuted}`}>Significant MICE activity in town — high revenue potential</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {isDateAnchor && item.start && (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className={t.textDim}>Date</span><span className={t.textBody}>{item.start}</span></div>
@@ -2409,11 +2789,11 @@ function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit,
 
           {hcInfo && (
             <div className={`${t.surface} rounded-lg p-3`}>
-              <h4 className={`text-xs font-bold ${t.textMuted} mb-1`}>Group Demand on this date</h4>
+              <h4 className={`text-xs font-bold ${t.textMuted} mb-1`}>1-Host Event Demand on this Date (Tripleseat)</h4>
               <div className="flex items-center gap-2">
                 {(hcInfo.rating === "hot-hot" || hcInfo.rating === "hot") ? <Flame className="w-4 h-4" style={{ color: LAYER_COLORS[hcInfo.rating].primary }} /> : <Snowflake className="w-4 h-4" style={{ color: LAYER_COLORS[hcInfo.rating].primary }} />}
                 <span className="text-sm font-medium" style={{ color: LAYER_COLORS[hcInfo.rating].primary }}>{LAYER_COLORS[hcInfo.rating].label}</span>
-                <span className={`text-xs ${t.textDim}`}>({hcInfo.count} events)</span>
+                <span className={`text-xs ${t.textDim}`}>({hcInfo.count} 1-Host event{hcInfo.count === 1 ? "" : "s"})</span>
               </div>
             </div>
           )}
