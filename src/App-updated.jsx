@@ -2963,7 +2963,7 @@ function SignIn({ t, onSignIn }) {
     const u = authEmail(email);
     if (!u) {
       if (!email.toLowerCase().endsWith("@1-group.sg")) setErr("Only @1-group.sg email addresses are accepted.");
-      else setErr("This email is not on the access list. Try the Email OTP tab instead, or contact a Marketing admin.");
+      else setErr("This email is not on the access list. Try the Group Access tab instead, or contact a Marketing admin.");
       return;
     }
     setBusy(true);
@@ -3089,7 +3089,7 @@ function SignIn({ t, onSignIn }) {
               onClick={() => { setMode("otp"); setErr(null); resetOtp(); }}
               className={`flex-1 text-xs py-1.5 rounded transition-all flex items-center justify-center gap-1 ${mode === "otp" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600"}`}
             >
-              <KeyRound className="w-3.5 h-3.5" /> Email OTP
+              <KeyRound className="w-3.5 h-3.5" /> Group Access
             </button>
             <button
               onClick={() => { setMode("venue"); setErr(null); resetOtp(); }}
@@ -3122,7 +3122,7 @@ function SignIn({ t, onSignIn }) {
                 <Shield className="w-4 h-4" /> Sign in
               </button>
               <p className={`text-xs ${t.textDim} mt-3 text-center`}>
-                Not on the admin list? Use the <strong>Email OTP</strong> tab if you have group-list access, or the <strong>Outlet</strong> tab if you're outlet staff.
+                Not on the admin list? Use the <strong>Group Access</strong> tab if you have group-list access, or the <strong>Outlet</strong> tab if you're outlet staff.
               </p>
             </>
           )}
