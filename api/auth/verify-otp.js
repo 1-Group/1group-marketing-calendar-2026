@@ -1,7 +1,9 @@
 // Vercel Serverless Function: POST /api/auth/verify-otp
 // ------------------------------------------------------
 // Body:    { email, code, challenge }
-// Returns: 200 { user, sessionToken }   — user has role: "user", read-only access
+// Returns: 200 { user, sessionToken }
+//          - For Flow A (group OTP): user has role: "user", read-only, all-venues access.
+//          - For Flow B (outlet OTP): user has role: "venue", venues: [...], scoped to those venues.
 //          400 { error }                — invalid challenge / wrong code / expired
 //          500 { error }                — server misconfigured
 //
@@ -10,13 +12,13 @@
 //
 // Security notes:
 //   - Constant-time comparison via crypto.timingSafeEqual
-//   - Challenge HMAC verifies the server issued it (so client can't forge)
+//   - Challenge HMAC verifies the server issued it (so client can't forge venues array)
 //   - Code itself is hashed inside challenge (raw code never crosses verify request boundary)
 //   - 12-hour session — re-OTP after that
 
 import crypto from "node:crypto";
 
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const ALLOWED_DOMAIN = "@1-group.sg";
 
 export default async function handler(req, res) {
@@ -93,15 +95,32 @@ export default async function handler(req, res) {
     .map(s => s.charAt(0).toUpperCase() + s.slice(1))
     .join(" ") || localPart;
 
-  const user = {
-    email,
-    role: "user",      // read-only access to all zones (canEdit/canSeeVenueCodes both return false; canSeeAllZones returns true)
-    name,
-    dept: "Staff",
-    auth: "otp",
-  };
+  // Branch on whether challenge encoded a venues array (outlet flow) or not (group flow)
+  const venues = Array.isArray(payload.venues) ? payload.venues.filter(v => typeof v === "string") : null;
+  let user;
+  if (venues && venues.length > 0) {
+    // Flow B — outlet user, scoped to one or more venues
+    user = {
+      email,
+      role: "venue",
+      venues,                  // array of allowed venue keys
+      venue: venues[0],        // primary venue (back-compat with existing client code)
+      name,
+      dept: "Outlet",
+      auth: "otp",
+    };
+  } else {
+    // Flow A — group access, all-venues read
+    user = {
+      email,
+      role: "user",
+      name,
+      dept: "Staff",
+      auth: "otp",
+    };
+  }
 
-  // Sign session token (client stores this; can be re-verified by server later if needed)
+  // Sign session token
   const sessionPayload = JSON.stringify({ ...user, expiresAt: Date.now() + SESSION_TTL_MS });
   const sessionSig = crypto.createHmac("sha256", otpSecret).update(sessionPayload).digest("hex");
   const sessionToken = Buffer.from(sessionPayload).toString("base64url") + "." + sessionSig;
