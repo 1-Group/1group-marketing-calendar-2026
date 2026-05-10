@@ -60,7 +60,13 @@ function authVenueCode(venueKey, code) {
 }
 
 function canEdit(user) { return user && (user.role === "master" || user.role === "admin"); }
-function canSeeAllZones(user) { return user && user.role !== "venue"; }
+// Multi-venue OTP users (e.g. mimi @ altitude+flowerhill) need a filtered zone selector,
+// so canSeeAllZones returns true for them; visibleVenueKeys later restricts what they see.
+function canSeeAllZones(user) {
+  if (!user) return false;
+  if (user.role !== "venue") return true;
+  return Array.isArray(user.venues) && user.venues.length > 1;
+}
 function canSeeVenueCodes(user) { return user && (user.role === "master" || user.role === "admin"); }
 
 // ─── STORAGE WRAPPER (localStorage for Vercel) ───
@@ -818,10 +824,15 @@ export default function MarketingCalendar() {
 
   const t = T;
 
-  // If a venue-only user is signed in, force their zone
+  // If a venue-only user is signed in, force selectedZone to one of their allowed venues
   useEffect(() => {
-    if (user?.role === "venue" && user.venue && selectedZone !== user.venue) {
-      setSelectedZone(user.venue);
+    if (user?.role !== "venue") return;
+    const allowed = Array.isArray(user.venues) && user.venues.length > 0
+      ? user.venues
+      : (user.venue ? [user.venue] : []);
+    if (allowed.length === 0) return;
+    if (!allowed.includes(selectedZone)) {
+      setSelectedZone(allowed[0]);
     }
   }, [user, selectedZone]);
 
@@ -919,7 +930,10 @@ export default function MarketingCalendar() {
   const handleSignIn = useCallback(async (u) => {
     setUser(u);
     try { await storage.set("calendar-user", JSON.stringify(u)); } catch {}
-    if (u.role === "venue" && u.venue) setSelectedZone(u.venue);
+    if (u.role === "venue") {
+      const primary = (Array.isArray(u.venues) && u.venues[0]) || u.venue;
+      if (primary) setSelectedZone(primary);
+    }
   }, []);
 
   const handleSignOut = useCallback(async () => {
@@ -1085,10 +1099,13 @@ export default function MarketingCalendar() {
   const canEditEvent = useCallback((item) => {
     if (!user) return false;
     if (user.role === "master" || user.role === "admin" || user.role === "staff") return true;
-    if (user.role === "venue" && user.venue) {
-      // Venue users can only touch venue-layer events whose venue matches theirs.
+    if (user.role === "venue") {
+      // Venue users can only touch venue-layer events whose venue is in their allowed set.
       if (item.layer !== "venue") return false;
-      return item.venue === user.venue;
+      const allowed = Array.isArray(user.venues) && user.venues.length > 0
+        ? user.venues
+        : (user.venue ? [user.venue] : []);
+      return allowed.includes(item.venue);
     }
     return false;
   }, [user]);
@@ -1731,7 +1748,15 @@ export default function MarketingCalendar() {
   const editOK = canEdit(user);
   const allZonesOK = canSeeAllZones(user);
   const codesOK = canSeeVenueCodes(user);
-  const visibleVenueKeys = allZonesOK ? VENUE_KEYS : [user.venue];
+  // For venue-role users (single OR multi-venue), restrict the zone selector to ONLY their assigned venues.
+  // For other roles, show all zones (group + every venue).
+  const visibleVenueKeys = (() => {
+    if (user.role !== "venue") return VENUE_KEYS;
+    const allowed = Array.isArray(user.venues) && user.venues.length > 0
+      ? user.venues
+      : (user.venue ? [user.venue] : []);
+    return allowed.length > 0 ? allowed : VENUE_KEYS;
+  })();
 
   return (
     <div className={`min-h-screen ${t.page}`} style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -2919,14 +2944,13 @@ function EventFormModal({ t, event, isPrefill, onSave, onClose }) {
 // ─── SIGN-IN PAGE ───
 
 function SignIn({ t, onSignIn }) {
-  const [mode, setMode] = useState("email"); // 'email' | 'venue' | 'otp'
+  const [mode, setMode] = useState("email"); // 'email' (admin) | 'otp' (group OTP) | 'venue' (outlet OTP)
   const [email, setEmail] = useState("");
-  const [venueKey, setVenueKey] = useState("summerhouse");
-  const [code, setCode] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  // OTP flow state
+  // Shared OTP flow state — used for both 'otp' (group) and 'venue' (outlet) modes.
+  // The mode flag tells the request handler whether to include the outlet flag in the API call.
   const [otpStep, setOtpStep] = useState("email"); // 'email' (request) | 'code' (enter received OTP)
   const [otpEmail, setOtpEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -2946,31 +2970,29 @@ function SignIn({ t, onSignIn }) {
     onSignIn(u);
   };
 
-  const handleVenue = () => {
-    setErr(null);
-    const u = authVenueCode(venueKey, code);
-    if (!u) {
-      setErr("Invalid access code for this outlet. Contact a Marketing admin for the current code.");
-      return;
-    }
-    setBusy(true);
-    onSignIn(u);
-  };
+  // (Note: the old code-based handleVenue was removed — outlet sign-in now uses the
+  //  shared OTP flow below, which branches on `mode === "venue"` to send the outlet flag.)
 
-  // OTP step 1: request a code
+  // OTP step 1: request a code (works for both 'otp' and 'venue' modes)
   const handleOtpRequest = async () => {
     setErr(null);
     const trimmed = otpEmail.trim().toLowerCase();
+    if (!/^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(trimmed)) {
+      setErr("Please enter a valid email address.");
+      return;
+    }
     if (!trimmed.endsWith("@1-group.sg")) {
       setErr("Only @1-group.sg email addresses are accepted.");
       return;
     }
     setBusy(true);
     try {
+      const reqBody = { email: trimmed };
+      if (mode === "venue") reqBody.outlet = true;
       const resp = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
+        body: JSON.stringify(reqBody),
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
@@ -3070,7 +3092,7 @@ function SignIn({ t, onSignIn }) {
               <KeyRound className="w-3.5 h-3.5" /> Email OTP
             </button>
             <button
-              onClick={() => { setMode("venue"); setErr(null); }}
+              onClick={() => { setMode("venue"); setErr(null); resetOtp(); }}
               className={`flex-1 text-xs py-1.5 rounded transition-all flex items-center justify-center gap-1 ${mode === "venue" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600"}`}
             >
               <Building2 className="w-3.5 h-3.5" /> Outlet
@@ -3100,7 +3122,7 @@ function SignIn({ t, onSignIn }) {
                 <Shield className="w-4 h-4" /> Sign in
               </button>
               <p className={`text-xs ${t.textDim} mt-3 text-center`}>
-                Not on the admin list? Use the <strong>Email OTP</strong> tab to sign in as a viewer.
+                Not on the admin list? Use the <strong>Email OTP</strong> tab if you have group-list access, or the <strong>Outlet</strong> tab if you're outlet staff.
               </p>
             </>
           )}
@@ -3108,7 +3130,7 @@ function SignIn({ t, onSignIn }) {
           {mode === "otp" && (
             <>
               <p className={`text-xs ${t.textMuted} mb-3 leading-relaxed`}>
-                For all <strong>1-Group staff</strong> with a <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">@1-group.sg</code> email. We'll send a one-time code to your inbox. Read-only access to all venues.
+                For all <strong>1-Group staff</strong> with a <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">@1-group.sg</code> email <strong>on the group access list</strong>. We'll send a one-time code to your inbox. Read-only access to all venues.
               </p>
 
               {otpStep === "email" ? (
@@ -3176,37 +3198,71 @@ function SignIn({ t, onSignIn }) {
           {mode === "venue" && (
             <>
               <p className={`text-xs ${t.textMuted} mb-3 leading-relaxed`}>
-                For outlet-based team members <strong>without</strong> a 1-Group email. The Marketing team will share a code for your outlet.
+                For <strong>outlet-based team members</strong> on the Marketing-managed allowlist. We'll send a 6-digit code to your <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">@1-group.sg</code> email. Access is scoped to your outlet's view only.
               </p>
-              <label className={`text-xs ${t.textMuted} block mb-1`}>Your outlet</label>
-              <select
-                value={venueKey}
-                onChange={e => setVenueKey(e.target.value)}
-                className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm mb-3`}
-              >
-                {Object.keys(VENUE_ACCESS_CODES).map(k => (
-                  <option key={k} value={k}>{VENUE_HC_RAW[k]?.name || k}</option>
-                ))}
-              </select>
-              <label className={`text-xs ${t.textMuted} block mb-1`}>Access code</label>
-              <input
-                type="text"
-                value={code}
-                onChange={e => setCode(e.target.value.toUpperCase())}
-                onKeyDown={onKey(handleVenue)}
-                placeholder="XXX-2026-XXXX"
-                className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-purple-500 mb-3 font-mono tracking-wider`}
-              />
-              <button
-                onClick={handleVenue}
-                disabled={busy}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
-              >
-                <KeyRound className="w-4 h-4" /> Enter outlet view
-              </button>
-              <p className={`text-xs ${t.textDim} mt-3 text-center`}>
-                Codes are provided by the Marketing team.
-              </p>
+
+              {otpStep === "email" ? (
+                <>
+                  <label className={`text-xs ${t.textMuted} block mb-1`}>Your 1-Group email</label>
+                  <input
+                    type="email"
+                    value={otpEmail}
+                    onChange={e => setOtpEmail(e.target.value)}
+                    onKeyDown={onKey(handleOtpRequest)}
+                    placeholder="firstname.lastname@1-group.sg"
+                    autoFocus
+                    disabled={busy}
+                    className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 mb-3`}
+                  />
+                  <button
+                    onClick={handleOtpRequest}
+                    disabled={busy || !otpEmail.trim()}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4" /> {busy ? "Sending…" : "Send sign-in code"}
+                  </button>
+                  <p className={`text-xs ${t.textDim} mt-3 text-center`}>
+                    Not on the outlet allowlist? Contact the Marketing team to request access.
+                  </p>
+                </>
+              ) : (
+                <>
+                  {otpSentMsg && (
+                    <div className="mb-3 flex items-start gap-2 p-2.5 rounded bg-indigo-50 border border-indigo-200 text-xs text-indigo-800">
+                      <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>{otpSentMsg}</span>
+                    </div>
+                  )}
+                  <label className={`text-xs ${t.textMuted} block mb-1`}>6-digit code from your email</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onKeyDown={onKey(handleOtpVerify)}
+                    placeholder="123456"
+                    autoFocus
+                    disabled={busy}
+                    className={`w-full ${t.input} border rounded-md px-3 py-3 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:border-indigo-500 mb-3`}
+                  />
+                  <button
+                    onClick={handleOtpVerify}
+                    disabled={busy || otpCode.length !== 6}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
+                  >
+                    <Check className="w-4 h-4" /> {busy ? "Verifying…" : "Verify and enter outlet view"}
+                  </button>
+                  <button
+                    onClick={resetOtp}
+                    disabled={busy}
+                    className={`w-full text-xs ${t.textMuted} hover:${t.textBody} mt-2 underline-offset-2 hover:underline`}
+                  >
+                    Use a different email
+                  </button>
+                </>
+              )}
             </>
           )}
 
@@ -3245,9 +3301,16 @@ function VenueCodesPanel({ t, onClose }) {
           <button onClick={onClose} className={`p-1 rounded-lg ${t.surfaceHover}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-4 space-y-2">
+          <div className={`p-3 rounded-lg border mb-3`} style={{ borderColor: "#FBBF24", background: "#FEF3C7" }}>
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#B45309" }} />
+              <div className={`text-xs ${t.textBody}`}>
+                <strong style={{ color: "#92400E" }}>These codes no longer authenticate sign-in.</strong> Outlet access has moved to email-based OTP. To grant a new outlet user access, edit <code className="text-[11px] bg-white px-1 py-0.5 rounded border">api/auth/send-otp.js</code> and add their email + venue array to the <code className="text-[11px] bg-white px-1 py-0.5 rounded border">OUTLET_ALLOWLIST</code> object. The codes below remain only as historical reference and may be removed in a future release.
+              </div>
+            </div>
+          </div>
           <p className={`text-xs ${t.textMuted} mb-3`}>
-            Share these codes with outlet staff so they can sign in via the <strong>Outlet</strong> tab.
-            Each code grants access to that outlet's calendar view only (read-only).
+            Historical outlet access codes (deprecated, kept for reference only):
           </p>
           {Object.entries(VENUE_ACCESS_CODES).map(([vkey, code]) => {
             const v = VENUE_HC_RAW[vkey];
