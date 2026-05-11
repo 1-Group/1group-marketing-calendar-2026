@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText } from "lucide-react";
+import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText, Download } from "lucide-react";
 
 // ─── AUTH: USERS + ACCESS CODES ───
 // NOTE: Client-side soft gate only. Anyone with DevTools can read this file.
@@ -1155,6 +1155,241 @@ export default function MarketingCalendar() {
     alert("Summary copied!");
   };
 
+  // Outlet Excel export — venue-scoped, includes ONLY this outlet's relevant layers:
+  //   Sheet 1: Venue Activities — all events tagged to this venue (from SEED_VENUE_EVENTS + venueEvents)
+  //   Sheet 2: 1-Group Campaigns — group-wide campaigns for marketing alignment
+  //   Sheet 3: Singapore Holidays — public + school holidays
+  //   Sheet 4: International Visitor Intensity — 10 markets × 12 months
+  // Deliberately excludes: MICE events, SG events (concerts/expos), Hot/Cold demand heatmap.
+  const exportVenueExcel = async (venueKey) => {
+    if (!venueKey || venueKey === "group") return;
+    const venue = VENUE_HC_RAW[venueKey];
+    if (!venue) return;
+
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "1-Group Marketing Calendar";
+      wb.created = new Date();
+
+      // Style helpers
+      const headerStyle = {
+        font: { bold: true, color: { argb: "FFFFFFFF" }, size: 11 },
+        fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FF6366F1" } },
+        alignment: { vertical: "middle", horizontal: "left" },
+      };
+      const titleStyle = {
+        font: { bold: true, size: 14, color: { argb: "FF0F172A" } },
+        alignment: { vertical: "middle" },
+      };
+      const subtitleStyle = {
+        font: { italic: true, size: 10, color: { argb: "FF64748B" } },
+        alignment: { vertical: "middle" },
+      };
+      const altRowFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+      const thinBorder = {
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } },
+      };
+
+      const applyTableStyle = (ws, headerRow, dataStartRow, dataEndRow) => {
+        ws.getRow(headerRow).eachCell(c => { c.style = headerStyle; c.border = thinBorder; });
+        ws.getRow(headerRow).height = 22;
+        for (let r = dataStartRow; r <= dataEndRow; r++) {
+          const row = ws.getRow(r);
+          row.eachCell(c => {
+            c.border = thinBorder;
+            c.alignment = { vertical: "middle", wrapText: true };
+          });
+          if ((r - dataStartRow) % 2 === 1) {
+            row.eachCell(c => { c.fill = altRowFill; });
+          }
+        }
+      };
+
+      const fmtDateRange = (e) => {
+        if (e.undated) return "Month-wide";
+        if (e.start && e.end && e.start !== e.end) return `${e.start} → ${e.end}`;
+        if (e.start) return e.start;
+        if (typeof e.month === "number") return MONTH_NAMES[e.month];
+        return "";
+      };
+
+      // ── Sheet 1: Venue Activities ────────────────────────────────────
+      const ws1 = wb.addWorksheet(venue.shortName + " Activities", {
+        properties: { tabColor: { argb: "FFEC4899" } },
+        views: [{ state: "frozen", ySplit: 4 }],
+      });
+      ws1.columns = [
+        { width: 12 }, { width: 18 }, { width: 40 }, { width: 18 }, { width: 50 },
+      ];
+      ws1.mergeCells("A1:E1");
+      ws1.getCell("A1").value = `${venue.name} — Marketing Activities 2026`;
+      ws1.getCell("A1").style = titleStyle;
+      ws1.getRow(1).height = 26;
+      ws1.mergeCells("A2:E2");
+      ws1.getCell("A2").value = `Generated ${new Date().toLocaleDateString("en-SG", { year: "numeric", month: "long", day: "numeric" })} · Read-only · Outlet-scoped calendar`;
+      ws1.getCell("A2").style = subtitleStyle;
+
+      // Collect all venue activities for this venue, sorted by month then date
+      const venueActivities = [...SEED_VENUE_EVENTS, ...venueEvents]
+        .filter(e => e.venue === venueKey)
+        .sort((a, b) => {
+          const aMonth = a.start ? parseInt(a.start.split("-")[1]) - 1 : (a.month ?? 12);
+          const bMonth = b.start ? parseInt(b.start.split("-")[1]) - 1 : (b.month ?? 12);
+          if (aMonth !== bMonth) return aMonth - bMonth;
+          const aDate = a.start || "";
+          const bDate = b.start || "";
+          return aDate.localeCompare(bDate);
+        });
+
+      const headers1 = ["Month", "Dates", "Activity", "Sub-brand", "Notes / Hook"];
+      ws1.getRow(4).values = headers1;
+      let row1 = 5;
+      venueActivities.forEach(e => {
+        const monthIdx = e.start ? parseInt(e.start.split("-")[1]) - 1 : e.month;
+        const monthLabel = typeof monthIdx === "number" ? MONTH_NAMES[monthIdx] : "—";
+        ws1.getRow(row1).values = [
+          monthLabel,
+          fmtDateRange(e),
+          e.name || "",
+          e.subBrand || "",
+          e.hook || "",
+        ];
+        row1++;
+      });
+      if (venueActivities.length === 0) {
+        ws1.mergeCells(`A5:E5`);
+        ws1.getCell("A5").value = `No activities scheduled for ${venue.name} in 2026 yet.`;
+        ws1.getCell("A5").style = subtitleStyle;
+        row1 = 6;
+      } else {
+        applyTableStyle(ws1, 4, 5, row1 - 1);
+      }
+
+      // ── Sheet 2: 1-Group Campaigns ────────────────────────────────────
+      const ws2 = wb.addWorksheet("1-Group Campaigns", {
+        properties: { tabColor: { argb: "FF8B5CF6" } },
+        views: [{ state: "frozen", ySplit: 4 }],
+      });
+      ws2.columns = [{ width: 12 }, { width: 36 }, { width: 50 }];
+      ws2.mergeCells("A1:C1");
+      ws2.getCell("A1").value = "1-Group Marketing Campaigns 2026";
+      ws2.getCell("A1").style = titleStyle;
+      ws2.getRow(1).height = 26;
+      ws2.mergeCells("A2:C2");
+      ws2.getCell("A2").value = "Group-wide campaigns to align your outlet activities with";
+      ws2.getCell("A2").style = subtitleStyle;
+
+      ws2.getRow(4).values = ["Month", "Campaign", "Tagline / Theme"];
+      let row2 = 5;
+      CAMPAIGNS.forEach(c => {
+        ws2.getRow(row2).values = [MONTH_NAMES[c.month] || "", c.name || "", c.tagline || ""];
+        row2++;
+      });
+      applyTableStyle(ws2, 4, 5, row2 - 1);
+
+      // ── Sheet 3: Singapore Holidays ──────────────────────────────────
+      const ws3 = wb.addWorksheet("Singapore Holidays", {
+        properties: { tabColor: { argb: "FFEAB308" } },
+        views: [{ state: "frozen", ySplit: 4 }],
+      });
+      ws3.columns = [{ width: 32 }, { width: 22 }, { width: 18 }];
+      ws3.mergeCells("A1:C1");
+      ws3.getCell("A1").value = "Singapore Public & School Holidays 2026";
+      ws3.getCell("A1").style = titleStyle;
+      ws3.getRow(1).height = 26;
+      ws3.mergeCells("A2:C2");
+      ws3.getCell("A2").value = "Demand drivers — peak family/leisure dining and gifting windows";
+      ws3.getCell("A2").style = subtitleStyle;
+
+      ws3.getRow(4).values = ["Holiday", "Date / Range", "Type"];
+      let row3 = 5;
+      PUBLIC_HOLIDAYS.forEach(h => {
+        ws3.getRow(row3).values = [h.name || "", h.date || "", "Public holiday"];
+        row3++;
+      });
+      SCHOOL_HOLIDAYS.forEach(h => {
+        const range = h.start === h.end ? h.start : `${h.start} → ${h.end}`;
+        ws3.getRow(row3).values = [h.name || "", range, "School holiday"];
+        row3++;
+      });
+      applyTableStyle(ws3, 4, 5, row3 - 1);
+
+      // ── Sheet 4: International Visitor Intensity ─────────────────────
+      const ws4 = wb.addWorksheet("Visitor Intensity", {
+        properties: { tabColor: { argb: "FF10B981" } },
+        views: [{ state: "frozen", ySplit: 4, xSplit: 2 }],
+      });
+      ws4.columns = [
+        { width: 22 }, { width: 18 },
+        { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 },
+        { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 },
+      ];
+      ws4.mergeCells("A1:N1");
+      ws4.getCell("A1").value = "International Visitor Markets — 2026 Monthly Intensity";
+      ws4.getCell("A1").style = titleStyle;
+      ws4.getRow(1).height = 26;
+      ws4.mergeCells("A2:N2");
+      ws4.getCell("A2").value = "Peak / High / Moderate / Low classifications by Singapore Tourism patterns";
+      ws4.getCell("A2").style = subtitleStyle;
+
+      ws4.getRow(4).values = ["Market", "Total Arrivals", ...MONTH_SHORT];
+      let row4 = 5;
+      const intensityFills = {
+        Peak: { type: "pattern", pattern: "solid", fgColor: { argb: "FF059669" } },
+        High: { type: "pattern", pattern: "solid", fgColor: { argb: "FF10B981" } },
+        Mod: { type: "pattern", pattern: "solid", fgColor: { argb: "FF6EE7B7" } },
+        Low: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1FAE5" } },
+      };
+      const intensityFontWhite = { color: { argb: "FFFFFFFF" }, bold: true };
+      const intensityFontDark = { color: { argb: "FF065F46" }, bold: true };
+      VISITOR_DATA.forEach(v => {
+        const row = ws4.getRow(row4);
+        row.values = [v.market, v.arrivals, ...MONTH_SHORT.map(m => v.data[m] || "")];
+        // Colour-code intensity cells
+        for (let c = 3; c <= 14; c++) {
+          const cell = row.getCell(c);
+          const val = cell.value;
+          if (intensityFills[val]) {
+            cell.fill = intensityFills[val];
+            cell.font = (val === "Peak" || val === "High") ? intensityFontWhite : intensityFontDark;
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          }
+        }
+        row4++;
+      });
+      // Style header row + borders
+      ws4.getRow(4).eachCell(c => { c.style = headerStyle; c.border = thinBorder; });
+      ws4.getRow(4).height = 22;
+      for (let r = 5; r < row4; r++) {
+        const row = ws4.getRow(r);
+        row.eachCell(c => {
+          if (!c.border) c.border = thinBorder;
+          else c.border = thinBorder;
+        });
+      }
+
+      // ── Save ─────────────────────────────────────────────────────────
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const filename = `1-Group_${venue.shortName.replace(/\s+/g, "_")}_Calendar_2026.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export failed:", e);
+      alert("Could not generate the Excel file. Please try again or contact a Marketing admin.");
+    }
+  };
+
   if (!loaded) return <div className={`flex items-center justify-center h-screen ${t.page}`}><div className="animate-pulse text-lg">Loading calendar...</div></div>;
 
   if (!user) return <SignIn t={t} onSignIn={handleSignIn} />;
@@ -1205,6 +1440,13 @@ export default function MarketingCalendar() {
               </div>
               {editOK && <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-md"><Plus className="w-3.5 h-3.5" /> Add</button>}
               <button onClick={copySummary} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Copy className="w-3.5 h-3.5" /> Copy</button>
+              {selectedZone !== "group" && (
+                <button
+                  onClick={() => exportVenueExcel(selectedZone)}
+                  title={`Download ${activeVenue.shortName} 2026 calendar (events, campaigns, holidays, visitors)`}
+                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-md"
+                ><Download className="w-3.5 h-3.5" /> {activeVenue.shortName} .xlsx</button>
+              )}
               {codesOK && <button onClick={() => setShowVenueCodes(true)} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><KeyRound className="w-3.5 h-3.5" /> Venue Codes</button>}
               {editOK && <button onClick={handleReset} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><RotateCcw className="w-3.5 h-3.5" /> Reset</button>}
               <button onClick={handleSignOut} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><LogOut className="w-3.5 h-3.5" /> Sign out</button>
