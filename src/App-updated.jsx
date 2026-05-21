@@ -60,6 +60,11 @@ function authVenueCode(venueKey, code) {
 }
 
 function canEdit(user) { return user && (user.role === "master" || user.role === "admin"); }
+// canAdd: who can OPEN the Add Event form.
+// - master + admin: can add any layer (SG / MICE / Campaign / Venue Activity)
+// - venue (outlet): can add Venue Activity for their own venue(s) only — enforced in the form + addEvent guard
+// - staff: still read-only (deliberately excluded)
+function canAdd(user) { return user && (user.role === "master" || user.role === "admin" || user.role === "venue"); }
 // Multi-venue OTP users (e.g. mimi @ altitude+flowerhill) need a filtered zone selector,
 // so canSeeAllZones returns true for them; visibleVenueKeys later restricts what they see.
 function canSeeAllZones(user) {
@@ -1108,7 +1113,21 @@ export default function MarketingCalendar() {
     return false;
   }, [user]);
 
-  const addEvent = (evt) => {
+  // enforceVenueRole: if the current user is venue-role, force any incoming event payload
+  // to be a venue-layer event scoped to one of their assigned venues. Client-side soft guard
+  // mirroring canEditEvent's restrictions; a determined user can bypass via DevTools, but
+  // this prevents accidental cross-venue writes from form-state manipulation.
+  const enforceVenueRole = useCallback((evt) => {
+    if (user?.role !== "venue") return evt;
+    const allowed = Array.isArray(user.venues) && user.venues.length > 0
+      ? user.venues
+      : (user.venue ? [user.venue] : []);
+    const safeVenue = allowed.includes(evt.venue) ? evt.venue : allowed[0];
+    return { ...evt, layer: "venue", venue: safeVenue };
+  }, [user]);
+
+  const addEvent = (rawEvt) => {
+    const evt = enforceVenueRole(rawEvt);
     // Venue-layer events go to venueEvents storage; everything else goes to customEvents.
     if (evt.layer === "venue") {
       const newEvt = { ...evt, id: `vn-user-${Date.now()}` };
@@ -1120,7 +1139,8 @@ export default function MarketingCalendar() {
     setShowAddForm(false);
   };
 
-  const updateEvent = (evt) => {
+  const updateEvent = (rawEvt) => {
+    const evt = enforceVenueRole(rawEvt);
     if (evt.layer === "venue") {
       saveVenueEvents(venueEvents.map(e => e.id === evt.id ? evt : e));
     } else {
@@ -1395,6 +1415,7 @@ export default function MarketingCalendar() {
   if (!user) return <SignIn t={t} onSignIn={handleSignIn} />;
 
   const editOK = canEdit(user);
+  const addOK = canAdd(user);
   const allZonesOK = canSeeAllZones(user);
   const codesOK = canSeeVenueCodes(user);
   // For venue-role users (single OR multi-venue), restrict the zone selector to ONLY their assigned venues.
@@ -1431,14 +1452,14 @@ export default function MarketingCalendar() {
                  <UserIcon className="w-3.5 h-3.5 text-slate-500" />}
                 <span className="font-medium">{user.name}</span>
                 <span className={t.textDim}>· {user.dept}</span>
-                {!editOK && <span className="text-xs px-1.5 py-0 rounded bg-slate-200 text-slate-700">Read-only</span>}
+                {!addOK && <span className="text-xs px-1.5 py-0 rounded bg-slate-200 text-slate-700">Read-only</span>}
               </div>
 
               <div className="relative">
                 <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${t.textDim}`} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events..." className={`${t.input} border rounded-md pl-7 pr-3 py-1.5 text-xs w-44 focus:outline-none focus:border-purple-500`} />
               </div>
-              {editOK && <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-md"><Plus className="w-3.5 h-3.5" /> Add</button>}
+              {addOK && <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-md"><Plus className="w-3.5 h-3.5" /> Add</button>}
               <button onClick={copySummary} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Copy className="w-3.5 h-3.5" /> Copy</button>
               {selectedZone !== "group" && (
                 <button
@@ -1732,7 +1753,7 @@ export default function MarketingCalendar() {
         {view === "heatmap" && <HeatmapView t={t} activeHC={activeHC} activeVenue={activeVenue} layers={layers} quarter={quarter} onDetail={setDetailItem} />}
       </div>
 
-      {detailItem && <DetailPanel t={t} activeHC={activeHC} item={detailItem} editOK={editOK} canEditEvent={canEditEvent} onClose={() => setDetailItem(null)} onEdit={(e) => { setDetailItem(null); setEditingEvent(e); }} onDelete={deleteEvent} onAddSimilar={(e) => {
+      {detailItem && <DetailPanel t={t} activeHC={activeHC} item={detailItem} editOK={addOK} canEditEvent={canEditEvent} onClose={() => setDetailItem(null)} onEdit={(e) => { setDetailItem(null); setEditingEvent(e); }} onDelete={deleteEvent} onAddSimilar={(e) => {
         // Pre-fill Add form with the viewed event's context (venue, sub-brand, layer, dates) but clear Name.
         setDetailItem(null);
         setShowAddForm(true);
@@ -1748,9 +1769,10 @@ export default function MarketingCalendar() {
         });
       }} />}
 
-      {editOK && (showAddForm || editingEvent) && (
+      {addOK && (showAddForm || editingEvent) && (
         <EventFormModal
           t={t}
+          user={user}
           event={editingEvent || prefillEvent}
           isPrefill={!editingEvent && !!prefillEvent}
           onSave={editingEvent ? updateEvent : addEvent}
@@ -2492,7 +2514,7 @@ function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit,
 
 // ─── EVENT FORM MODAL ───
 
-function EventFormModal({ t, event, isPrefill, onSave, onClose }) {
+function EventFormModal({ t, user, event, isPrefill, onSave, onClose }) {
   // Backward compat: if editing a legacy custom event with a display-name venue
   // (e.g. "1-Flowerhill"), map it back to its slug ("flowerhill") on load.
   const DISPLAY_TO_SLUG = {
@@ -2502,8 +2524,42 @@ function EventFormModal({ t, event, isPrefill, onSave, onClose }) {
   };
   const normaliseVenue = (v) => DISPLAY_TO_SLUG[v] || v || "";
 
+  // Venue-role constraints: outlet users can only add Venue Activity for their own venue(s).
+  // - Single-venue users: venue dropdown is locked to their venue.
+  // - Multi-venue users (e.g. mimi at altitude+flowerhill): dropdown limited to their venues.
+  // - Layer is forced to "venue" (no SG / MICE / Campaign adds).
+  const isVenueUser = user?.role === "venue";
+  const venueUserVenues = isVenueUser
+    ? (Array.isArray(user.venues) && user.venues.length > 0
+        ? user.venues
+        : (user.venue ? [user.venue] : []))
+    : null;
+
+  // All available venue options (slug, display) — used for non-venue users + filtered for venue users.
+  const VENUE_OPTIONS = [
+    ["summerhouse", "The Summerhouse"],
+    ["garage", "The Garage"],
+    ["altitude", "1-Altitude Coast"],
+    ["arden", "1-Arden"],
+    ["alkaff", "The Alkaff Mansion"],
+    ["alfaro", "1-Alfaro"],
+    ["atico", "1-Atico"],
+    ["riverhouse", "The Riverhouse"],
+    ["flowerhill", "1-Flowerhill"],
+    ["monti", "Monti"],
+  ];
+  const allowedVenueOptions = isVenueUser
+    ? VENUE_OPTIONS.filter(([slug]) => venueUserVenues.includes(slug))
+    : VENUE_OPTIONS;
+
   const [form, setForm] = useState(event ? { ...event, venue: normaliseVenue(event.venue) } : {
-    name: "", layer: "sg", start: "2026-01-01", end: "2026-01-01", type: "", venue: "", cat: "", dateStr: "",
+    name: "",
+    layer: isVenueUser ? "venue" : "sg",
+    start: "2026-01-01",
+    end: "2026-01-01",
+    type: "",
+    venue: isVenueUser && venueUserVenues[0] ? venueUserVenues[0] : "",
+    cat: "", dateStr: "",
     subBrand: "", hook: "",
   });
 
@@ -2530,25 +2586,36 @@ function EventFormModal({ t, event, isPrefill, onSave, onClose }) {
       <div className={`absolute inset-0 ${t.modalBg}`} />
       <div className={`relative ${t.panel} border rounded-xl p-5 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <h3 className={`font-bold text-sm ${t.textHead}`}>{event && !isPrefill ? "Edit Event" : "Add Event"}</h3>
+        {isVenueUser && (
+          <div className="text-xs px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2">
+            <Building2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>You're signed in as an outlet user. Events you add are scoped to <strong>{allowedVenueOptions.map(([,n]) => n).join(", ") || "your venue"}</strong> and saved as Venue Activity.</span>
+          </div>
+        )}
         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Event name *" className={inputCls} />
-        <select value={form.layer} onChange={e => setForm({ ...form, layer: e.target.value })} className={inputCls}>
-          <option value="sg">SG Event</option>
-          <option value="mice">MICE</option>
-          <option value="campaign">Campaign</option>
-          <option value="venue">Venue Activity</option>
-        </select>
-        <select value={form.venue || ""} onChange={e => setForm({ ...form, venue: e.target.value, subBrand: "" })} className={inputCls}>
-          <option value="">— No venue —</option>
-          <option value="summerhouse">The Summerhouse</option>
-          <option value="garage">The Garage</option>
-          <option value="altitude">1-Altitude Coast</option>
-          <option value="arden">1-Arden</option>
-          <option value="alkaff">The Alkaff Mansion</option>
-          <option value="alfaro">1-Alfaro</option>
-          <option value="atico">1-Atico</option>
-          <option value="riverhouse">The Riverhouse</option>
-          <option value="flowerhill">1-Flowerhill</option>
-          <option value="monti">Monti</option>
+        {isVenueUser ? (
+          <div className={`${inputCls} flex items-center gap-2 ${t.textDim}`} style={{ cursor: "not-allowed", opacity: 0.75 }} title="Outlet users can only add Venue Activity">
+            <Building2 className="w-3.5 h-3.5" /> Venue Activity
+          </div>
+        ) : (
+          <select value={form.layer} onChange={e => setForm({ ...form, layer: e.target.value })} className={inputCls}>
+            <option value="sg">SG Event</option>
+            <option value="mice">MICE</option>
+            <option value="campaign">Campaign</option>
+            <option value="venue">Venue Activity</option>
+          </select>
+        )}
+        <select
+          value={form.venue || ""}
+          onChange={e => setForm({ ...form, venue: e.target.value, subBrand: "" })}
+          className={inputCls}
+          disabled={isVenueUser && allowedVenueOptions.length === 1}
+          title={isVenueUser && allowedVenueOptions.length === 1 ? "Locked to your assigned venue" : undefined}
+        >
+          {!isVenueUser && <option value="">— No venue —</option>}
+          {allowedVenueOptions.map(([slug, label]) => (
+            <option key={slug} value={slug}>{label}</option>
+          ))}
         </select>
         {isVenue && subBrandOptions && (
           <select value={form.subBrand || ""} onChange={e => setForm({ ...form, subBrand: e.target.value })} className={inputCls}>
