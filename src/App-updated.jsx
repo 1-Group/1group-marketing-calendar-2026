@@ -823,6 +823,7 @@ export default function MarketingCalendar() {
   const [selectedZone, setSelectedZone] = useState("group"); // "group" or a venue key
   const [user, setUser] = useState(null); // { email?, role, name, dept, venue? }
   const [showVenueCodes, setShowVenueCodes] = useState(false);
+  const [showAccessLog, setShowAccessLog] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const t = T;
@@ -851,10 +852,13 @@ export default function MarketingCalendar() {
           const u = JSON.parse(sess.value);
           // Re-validate against current allowlist
           if (u.email && AUTH_USERS[u.email]) {
-            setUser({ email: u.email, ...AUTH_USERS[u.email] });
+            const restored = { email: u.email, ...AUTH_USERS[u.email] };
+            setUser(restored);
+            logAccess(restored);
           } else if (u.role === "venue" && u.venue && VENUE_HC_RAW[u.venue]) {
             setUser(u);
             setSelectedZone(u.venue);
+            logAccess(u);
           }
         }
         const saved = await storage.get("calendar-events");
@@ -930,14 +934,42 @@ export default function MarketingCalendar() {
     })();
   }, []);
 
+  // logAccess: fire-and-forget POST to /api/log/hit so the master admin can see
+  // who has opened the calendar. Called on fresh sign-in AND on restored-session
+  // load (the two are mutually exclusive per page load, so it fires exactly once).
+  // Never throws, never blocks — logging must not affect the app.
+  const logAccess = useCallback((u) => {
+    if (!u) return;
+    try {
+      let sessionToken = null;
+      try { sessionToken = localStorage.getItem("calendar-otp-session"); } catch {}
+      const payload = {
+        name: u.name || "Unknown",
+        role: u.role || "unknown",
+        dept: u.dept || "",
+        venue: u.venue || "",
+        email: u.email || "",
+        auth: u.auth || "client",
+      };
+      if (sessionToken) payload.sessionToken = sessionToken;
+      fetch("/api/log/hit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* logging must never break the app */ }
+  }, []);
+
   const handleSignIn = useCallback(async (u) => {
     setUser(u);
+    logAccess(u);
     try { await storage.set("calendar-user", JSON.stringify(u)); } catch {}
     if (u.role === "venue") {
       const primary = (Array.isArray(u.venues) && u.venues[0]) || u.venue;
       if (primary) setSelectedZone(primary);
     }
-  }, []);
+  }, [logAccess]);
 
   const handleSignOut = useCallback(async () => {
     setUser(null);
@@ -1418,6 +1450,8 @@ export default function MarketingCalendar() {
   const addOK = canAdd(user);
   const allZonesOK = canSeeAllZones(user);
   const codesOK = canSeeVenueCodes(user);
+  // Access Log is master-only — Chris asked that only he can see who's been looking.
+  const logOK = user.role === "master";
   // For venue-role users (single OR multi-venue), restrict the zone selector to ONLY their assigned venues.
   // For other roles, show all zones (group + every venue).
   const visibleVenueKeys = (() => {
@@ -1469,6 +1503,7 @@ export default function MarketingCalendar() {
                 ><Download className="w-3.5 h-3.5" /> {activeVenue.shortName} .xlsx</button>
               )}
               {codesOK && <button onClick={() => setShowVenueCodes(true)} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><KeyRound className="w-3.5 h-3.5" /> Venue Codes</button>}
+              {logOK && <button onClick={() => setShowAccessLog(true)} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Eye className="w-3.5 h-3.5" /> Access Log</button>}
               {editOK && <button onClick={handleReset} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><RotateCcw className="w-3.5 h-3.5" /> Reset</button>}
               <button onClick={handleSignOut} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><LogOut className="w-3.5 h-3.5" /> Sign out</button>
             </div>
@@ -1781,6 +1816,7 @@ export default function MarketingCalendar() {
       )}
 
       {showVenueCodes && codesOK && <VenueCodesPanel t={t} onClose={() => setShowVenueCodes(false)} />}
+      {showAccessLog && logOK && <AccessLogPanel t={t} onClose={() => setShowAccessLog(false)} />}
     </div>
   );
 }
@@ -3039,6 +3075,147 @@ function VenueCodesPanel({ t, onClose }) {
               </div>
             );
           })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ACCESS LOG PANEL (master only) ───
+// Shows who has opened the calendar. Reads /api/log/list, which is gated by a
+// passphrase (CALENDAR_LOG_KEY env var) — master/admin sign in client-side and
+// have no server token, so the passphrase is the read gate.
+function AccessLogPanel({ t, onClose }) {
+  const [logKey, setLogKey] = useState("");
+  const [entries, setEntries] = useState(null);
+  const [total, setTotal] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [authed, setAuthed] = useState(false);
+
+  const load = async (passphrase) => {
+    if (!passphrase) return;
+    setBusy(true); setErr(null);
+    try {
+      const resp = await fetch("/api/log/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: passphrase }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setErr(data.error || "Could not load the access log.");
+        setBusy(false);
+        return;
+      }
+      setEntries(Array.isArray(data.entries) ? data.entries : []);
+      setTotal(data.total || 0);
+      setAuthed(true);
+    } catch {
+      setErr("Network error — please try again.");
+    }
+    setBusy(false);
+  };
+
+  const fmt = (ts) => {
+    try {
+      return new Date(ts).toLocaleString("en-SG", {
+        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true,
+      });
+    } catch { return String(ts); }
+  };
+  const roleLabel = (r) => ({
+    master: "Master", admin: "Admin", staff: "Staff", user: "Group", venue: "Outlet",
+  }[r] || r || "—");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`absolute inset-0 ${t.overlayBg}`} />
+      <div className={`relative ${t.panel} border rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-xl`} onClick={e => e.stopPropagation()}>
+        <div className={`sticky top-0 ${t.panel} border-b p-4 flex items-center justify-between z-10`}>
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-purple-600" />
+            <h3 className={`font-bold text-sm ${t.textHead}`}>Calendar Access Log</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {authed && (
+              <button onClick={() => load(logKey)} disabled={busy} className={`text-xs px-2 py-1 rounded ${t.surfaceStrong} ${t.surfaceStrongHover} flex items-center gap-1`}>
+                <RotateCcw className="w-3 h-3" /> Refresh
+              </button>
+            )}
+            <button onClick={onClose} className={`p-1 rounded-lg ${t.surfaceHover}`}><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {!authed && (
+            <div className="space-y-3">
+              <div className={`p-3 rounded-lg border text-xs ${t.textBody}`} style={{ borderColor: "#C4B5FD", background: "#F5F3FF" }}>
+                <div className="flex items-start gap-2">
+                  <Lock className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#7C3AED" }} />
+                  <span>Enter the access-log passphrase — the <code className="text-[11px] bg-white px-1 py-0.5 rounded border">CALENDAR_LOG_KEY</code> set in Vercel, known only to you.</span>
+                </div>
+              </div>
+              <input
+                type="password"
+                value={logKey}
+                onChange={e => setLogKey(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") load(logKey); }}
+                placeholder="Access-log passphrase"
+                className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-purple-500`}
+                autoFocus
+              />
+              {err && <div className="text-xs text-red-600">{err}</div>}
+              <button onClick={() => load(logKey)} disabled={busy || !logKey} className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm py-2 rounded-md flex items-center justify-center gap-1">
+                {busy ? "Checking…" : <><Eye className="w-3.5 h-3.5" /> View access log</>}
+              </button>
+            </div>
+          )}
+
+          {authed && (
+            <>
+              <p className={`text-xs ${t.textMuted}`}>
+                {total} calendar open{total === 1 ? "" : "s"} recorded · newest first · most recent 1000 kept
+              </p>
+              {err && <div className="text-xs text-red-600">{err}</div>}
+              {entries && entries.length === 0 && (
+                <div className={`text-xs ${t.textMuted} py-8 text-center`}>No calendar opens recorded yet.</div>
+              )}
+              {entries && entries.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className={`text-left ${t.textMuted} border-b ${t.border}`}>
+                        <th className="py-1.5 pr-3 font-semibold whitespace-nowrap">When</th>
+                        <th className="py-1.5 pr-3 font-semibold">Name</th>
+                        <th className="py-1.5 pr-3 font-semibold">Role</th>
+                        <th className="py-1.5 pr-3 font-semibold">Venue / Dept</th>
+                        <th className="py-1.5 pr-3 font-semibold whitespace-nowrap">Sign-in</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entries.map((e, i) => (
+                        <tr key={i} className={`border-b ${t.border}`}>
+                          <td className={`py-1.5 pr-3 whitespace-nowrap ${t.textBody}`}>{fmt(e.ts)}</td>
+                          <td className={`py-1.5 pr-3 ${t.textBody} font-medium`}>{e.name || "—"}</td>
+                          <td className={`py-1.5 pr-3 ${t.textMuted}`}>{roleLabel(e.role)}</td>
+                          <td className={`py-1.5 pr-3 ${t.textMuted}`}>{e.venue ? (VENUE_HC_RAW[e.venue]?.name || e.venue) : (e.dept || "—")}</td>
+                          <td className="py-1.5 pr-3 whitespace-nowrap">
+                            {e.verified
+                              ? <span className="text-emerald-600 inline-flex items-center gap-0.5"><Check className="w-3 h-3" /> OTP verified</span>
+                              : <span className={t.textMuted}>client</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className={`text-[11px] ${t.textMuted} pt-1`}>
+                "OTP verified" = identity confirmed by a signed session token. "client" = master/admin sign-in (client-side allowlist, no token) — expected for your own and the Marketing team's logins.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
