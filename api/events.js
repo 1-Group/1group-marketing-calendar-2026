@@ -1,28 +1,40 @@
 // Vercel Serverless Function: GET /api/events?venue=&date=
 // ---------------------------------------------------------
-// Returns sanitised calendar events for the 1HostHub integration, filtered by
-// venue and/or date. Protected by a shared bearer token (HUB_API_KEY), compared
-// in constant time to match the rest of this codebase (see api/log/list.js,
-// api/auth/verify-otp.js).
+// Calendar feed for the 1HostHub integration. Protected by a shared bearer
+// token (HUB_API_KEY), compared in constant time to match the rest of this
+// codebase (see api/log/list.js, api/auth/verify-otp.js).
 //
-// Data source: public/data/tripleseat-events.json (produced by
-// scripts/sync-tripleseat.cjs and served statically at /data/...). Each event:
-//   { id, layer, name, venue, category, guest_band, start, end }   // start/end = "YYYY-MM-DD"
+// Data source: the 2026 marketing calendar dataset in src/data/calendar2026.js
+// (the same data the React app renders), reshaped by api/_lib/calendar.js into
+// the demand / context / events model the hub consumes.
 //
-// Query (both optional — omit one to skip that filter):
-//   ?venue=  — case-insensitive exact match on the event's venue label
-//   ?date=   — "YYYY-MM-DD"; returns events whose span covers that day (start <= date <= end)
+// Query (both optional):
+//   ?venue=  — venue display name (e.g. "1-Flowerhill", "The Summer House"),
+//              internal key, or the app label; matched case/spacing-insensitively
+//   ?date=   — "YYYY-MM-DD"; the day to read demand + what's on
 //
-// Returns: 200 [ ...events ]   — matches (empty array if none / data not yet generated)
-//          400 { error }       — malformed date
-//          401 { error }       — wrong / missing bearer token
-//          405 { error }       — non-GET
-//          500 { error }       — server not configured
+// Returns 200 with:
+//   {
+//     query:    { venue, date },                 // echo of the resolved query
+//     demand:   { level, score, label } | null,  // venue+date only
+//     context:  [ { kind, title, date, notes, impact } ],
+//     events:   [ { date, venue, type, title, status, notes } ],
+//     value:    <events>,   // OData-style aliases kept for backward-compat
+//     Count:    <events.length>
+//   }
+//   400 { error }  — malformed date
+//   401 { error }  — wrong / missing bearer token
+//   405 { error }  — non-GET
+//   500 { error }  — server not configured (HUB_API_KEY unset/too short)
 //
 // Env vars required:
-//   HUB_API_KEY  — shared secret set in Vercel -> Settings -> Env Vars (6+ chars)
+//   HUB_API_KEY — shared secret set in Vercel → Settings → Env Vars (6+ chars)
 
 import crypto from "node:crypto";
+import {
+  PUBLIC_VENUE_KEYS, resolveVenueKey, venueDisplayName,
+  computeDemand, computeContext, computeEvents, listActivities,
+} from "./_lib/calendar.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -31,24 +43,6 @@ function constantEquals(a, b) {
   const bb = Buffer.from(String(b));
   if (ab.length !== bb.length) return false;
   return crypto.timingSafeEqual(ab, bb);
-}
-
-// Fetch the statically-served events file from this same deployment. Returns []
-// if the file hasn't been generated yet (sync not run) so the endpoint stays up.
-async function loadEvents(req) {
-  const host = req.headers.host;
-  if (!host) return [];
-  const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0];
-  try {
-    const resp = await fetch(`${proto}://${host}/data/tripleseat-events.json`);
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    if (Array.isArray(data)) return data;
-    return Array.isArray(data.events) ? data.events : [];
-  } catch (err) {
-    console.error("[events] could not load events data:", err && err.message);
-    return [];
-  }
 }
 
 export default async function handler(req, res) {
@@ -73,21 +67,45 @@ export default async function handler(req, res) {
   }
 
   const query = req.query || {};
-  const venue = String(query.venue || "").trim().toLowerCase();
+  const venueRaw = String(query.venue || "").trim();
   const date = String(query.date || "").trim();
 
   if (date && !DATE_RE.test(date)) {
     return res.status(400).json({ error: "Invalid date — expected format YYYY-MM-DD." });
   }
 
-  let events = await loadEvents(req);
-  if (venue) {
-    events = events.filter((e) => String(e.venue || "").toLowerCase() === venue);
-  }
+  const venueKey = venueRaw ? resolveVenueKey(venueRaw) : null;
+  const venueUnknown = Boolean(venueRaw) && !venueKey;
+
+  let demand = null;
+  let context = [];
+  let events = [];
+
   if (date) {
-    // start/end are "YYYY-MM-DD" strings, so lexicographic compare is date-correct.
-    events = events.filter((e) => e.start <= date && date <= (e.end || e.start));
+    context = computeContext(date);
+    if (venueKey) {
+      events = computeEvents(venueKey, date);
+      demand = computeDemand(venueKey, date);
+    } else if (!venueUnknown) {
+      // No venue filter → everything physically on across all venues that day.
+      for (const k of PUBLIC_VENUE_KEYS) events.push(...computeEvents(k, date));
+    }
+  } else if (!venueUnknown) {
+    // No date → list the marketing activities (whole year) so the hub can
+    // confirm the wiring even with loose filters.
+    events = listActivities(venueKey ? [venueKey] : PUBLIC_VENUE_KEYS);
   }
 
-  return res.status(200).json(events);
+  const payload = {
+    query: { venue: venueKey ? venueDisplayName(venueKey) : (venueRaw || null), date: date || null },
+    demand,
+    context,
+    events,
+    // Backward-compatible OData-style aliases the hub historically read.
+    value: events,
+    Count: events.length,
+  };
+  if (venueUnknown) payload.warning = `Unknown venue "${venueRaw}". Expected one of: ${PUBLIC_VENUE_KEYS.map(venueDisplayName).join(", ")}.`;
+
+  return res.status(200).json(payload);
 }
