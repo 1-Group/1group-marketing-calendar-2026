@@ -44,6 +44,8 @@ const GROUP_ALLOWLIST = new Set([
   "jessie.tan@1-group.sg",
   "tom.kung@1-group.sg",
   "felix.chong@1-group.sg",
+  "niesa.osman@1-group.sg",
+  "chloe.chua@1-group.sg",
 ]);
 
 // ─── OUTLET-LEVEL ACCESS ALLOWLIST ───────────────────────────────────────
