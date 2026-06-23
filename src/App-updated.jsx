@@ -2438,6 +2438,7 @@ function AccessLogPanel({ t, onClose }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [authed, setAuthed] = useState(false);
+  const [range, setRange] = useState("all");
 
   const load = async (passphrase) => {
     if (!passphrase) return;
@@ -2473,6 +2474,24 @@ function AccessLogPanel({ t, onClose }) {
   const roleLabel = (r) => ({
     master: "Master", admin: "Admin", staff: "Staff", user: "Group", venue: "Outlet",
   }[r] || r || "—");
+
+  // Time-range filtering. Entries already include `ts` (epoch ms); the full
+  // set (up to the latest 1000) is fetched once, so filtering is client-side.
+  const RANGES = [
+    { k: "1d", label: "24 hours", ms: 24 * 60 * 60 * 1000 },
+    { k: "7d", label: "7 days", ms: 7 * 24 * 60 * 60 * 1000 },
+    { k: "30d", label: "30 days", ms: 30 * 24 * 60 * 60 * 1000 },
+    { k: "all", label: "All", ms: Infinity },
+  ];
+  const rangeMs = RANGES.find(r => r.k === range)?.ms ?? Infinity;
+  const rangeLabel = RANGES.find(r => r.k === range)?.label ?? "All";
+  const shown = (entries || []).filter(
+    e => rangeMs === Infinity || (Date.now() - (e.ts || 0)) <= rangeMs
+  );
+  // "Who has logged in" = unique people (by email, falling back to name).
+  const uniquePeople = new Set(
+    shown.map(e => String(e.email || e.name || "").trim().toLowerCase()).filter(Boolean)
+  ).size;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -2520,14 +2539,34 @@ function AccessLogPanel({ t, onClose }) {
 
           {authed && (
             <>
+              <div className="flex flex-wrap items-center gap-1">
+                {RANGES.map(r => (
+                  <button
+                    key={r.k}
+                    onClick={() => setRange(r.k)}
+                    className={`text-xs px-2.5 py-1 rounded-md border ${
+                      range === r.k
+                        ? "bg-purple-600 text-white border-purple-600"
+                        : `${t.surfaceStrong} ${t.surfaceStrongHover} ${t.border}`
+                    }`}
+                  >
+                    {r.k === "all" ? "All time" : `Last ${r.label}`}
+                  </button>
+                ))}
+              </div>
               <p className={`text-xs ${t.textMuted}`}>
-                {total} calendar open{total === 1 ? "" : "s"} recorded · newest first · most recent 1000 kept
+                {range === "all"
+                  ? <><span className={`font-semibold ${t.textBody}`}>{uniquePeople}</span> {uniquePeople === 1 ? "person" : "people"} · {shown.length} calendar open{shown.length === 1 ? "" : "s"} · newest first · most recent 1000 kept</>
+                  : <><span className={`font-semibold ${t.textBody}`}>{uniquePeople}</span> {uniquePeople === 1 ? "person" : "people"} · {shown.length} open{shown.length === 1 ? "" : "s"} in the last {rangeLabel} · newest first</>}
               </p>
               {err && <div className="text-xs text-red-600">{err}</div>}
               {entries && entries.length === 0 && (
                 <div className={`text-xs ${t.textMuted} py-8 text-center`}>No calendar opens recorded yet.</div>
               )}
-              {entries && entries.length > 0 && (
+              {entries && entries.length > 0 && shown.length === 0 && (
+                <div className={`text-xs ${t.textMuted} py-8 text-center`}>No calendar opens in the last {rangeLabel}.</div>
+              )}
+              {shown.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
@@ -2540,7 +2579,7 @@ function AccessLogPanel({ t, onClose }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {entries.map((e, i) => (
+                      {shown.map((e, i) => (
                         <tr key={i} className={`border-b ${t.border}`}>
                           <td className={`py-1.5 pr-3 whitespace-nowrap ${t.textBody}`}>{fmt(e.ts)}</td>
                           <td className={`py-1.5 pr-3 ${t.textBody} font-medium`}>{e.name || "—"}</td>
