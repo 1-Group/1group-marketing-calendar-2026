@@ -2,10 +2,18 @@ name: Deploy to Vercel
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Target a specific Vercel project/team. Without these, the Vercel CLI
+    # links to the token owner's *personal* scope, which is the wrong project
+    # and does not serve the production domain. The CLI reads these env vars
+    # automatically, so no --scope flag is needed on the commands below.
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
 
