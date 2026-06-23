@@ -87,6 +87,7 @@ const OUTLET_ALLOWLIST = {
   "joshiah.black@1-group.sg":     ["atico"],
   "watt.desiree@1-group.sg":      ["atico"],
   "heydel.usman@1-group.sg":      ["atico"],
+  "niesa.osman@1-group.sg":       ["atico"],
 
   // Monti
   "davide.carella@1-group.sg":    ["monti"],                    // also staff via Admin tab
