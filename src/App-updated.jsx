@@ -2612,7 +2612,7 @@ function VenueCodesPanel({ t, onClose }) {
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#B45309" }} />
               <div className={`text-xs ${t.textBody}`}>
-                <strong style={{ color: "#92400E" }}>These codes no longer authenticate sign-in.</strong> Outlet access has moved to email-based OTP. To grant a new outlet user access, edit <code className="text-[11px] bg-white px-1 py-0.5 rounded border">api/auth/send-otp.js</code> and add their email + venue array to the <code className="text-[11px] bg-white px-1 py-0.5 rounded border">OUTLET_ALLOWLIST</code> object. The codes below remain only as historical reference and may be removed in a future release.
+                <strong style={{ color: "#92400E" }}>These codes no longer authenticate sign-in.</strong> Outlet access has moved to email-based OTP. To grant a new outlet user access, open the <strong>Members</strong> panel, add their <code className="text-[11px] bg-white px-1 py-0.5 rounded border">@1-group.sg</code> email, set their access level to <strong>Outlet</strong> and pick their venue(s) — no code change needed. The codes below remain only as historical reference and may be removed in a future release.
               </div>
             </div>
           </div>
