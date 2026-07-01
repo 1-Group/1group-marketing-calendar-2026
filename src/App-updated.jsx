@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText, Download } from "lucide-react";
+import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText, Download, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 
 // ─── AUTH: USERS + ACCESS CODES ───
 // NOTE: Client-side soft gate only. Anyone with DevTools can read this file.
@@ -170,6 +170,7 @@ export default function MarketingCalendar() {
   const [user, setUser] = useState(null); // { email?, role, name, dept, venue? }
   const [showVenueCodes, setShowVenueCodes] = useState(false);
   const [showAccessLog, setShowAccessLog] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const t = T;
@@ -841,6 +842,11 @@ export default function MarketingCalendar() {
               </div>
               {addOK && <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-md"><Plus className="w-3.5 h-3.5" /> Add</button>}
               <button onClick={copySummary} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Copy className="w-3.5 h-3.5" /> Copy</button>
+              <button
+                onClick={() => setShowUpload(true)}
+                title="Upload your target sheet — the app adds the 2026 calendar (events, heat map, holidays…) as extra columns"
+                className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-md"
+              ><Upload className="w-3.5 h-3.5" /> Enrich Target Sheet</button>
               {selectedZone !== "group" && (
                 <button
                   onClick={() => exportVenueExcel(selectedZone)}
@@ -1163,6 +1169,14 @@ export default function MarketingCalendar() {
 
       {showVenueCodes && codesOK && <VenueCodesPanel t={t} onClose={() => setShowVenueCodes(false)} />}
       {showAccessLog && logOK && <AccessLogPanel t={t} onClose={() => setShowAccessLog(false)} />}
+      {showUpload && (
+        <TargetSheetUpload
+          t={t}
+          defaultZone={selectedZone}
+          venueKeys={visibleVenueKeys}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2372,6 +2386,183 @@ function SignIn({ t, onSignIn }) {
 }
 
 // ─── VENUE CODES PANEL (admins only) ───
+
+// ─── TARGET SHEET UPLOAD & ENRICHMENT ───
+// A team member uploads their own target/forecast workbook (e.g. a 3-month daily
+// target sheet). We attach the 2026 marketing-calendar context — demand heat map,
+// holidays, SG/MICE events, campaigns, venue activities, visitor peaks — as extra
+// columns to the right of each date-based tab, then hand back the enriched file.
+// The transform is non-destructive: existing values/formulas/formatting are kept.
+function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
+  const [zone, setZone] = useState(defaultZone || "group");
+  const [file, setFile] = useState(null);
+  const [phase, setPhase] = useState("idle"); // idle | working | done | error
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  // Kept in sync with ENRICHMENT_COLUMNS in src/lib/enrichTargetSheet.js.
+  // Duplicated here (rather than imported) so the heavy ExcelJS-backed module
+  // stays lazily loaded and out of the main bundle until the user actually runs it.
+  const ADDED_COLUMNS = [
+    "Demand (Hot/Cold)", "Public Holiday", "School Holiday", "SG Events",
+    "MICE Events", "1-Group Campaigns", "Venue Activities", "Visitor Peaks",
+  ];
+
+  const zones = (Array.isArray(venueKeys) && venueKeys.length ? venueKeys : VENUE_KEYS);
+
+  const pickFile = (f) => {
+    if (!f) return;
+    if (!/\.xlsx$/i.test(f.name)) {
+      setError("Please choose an .xlsx file (Excel workbook).");
+      setPhase("error");
+      setFile(null);
+      return;
+    }
+    setError("");
+    setPhase("idle");
+    setResult(null);
+    setFile(f);
+  };
+
+  const run = async () => {
+    if (!file) return;
+    setPhase("working");
+    setError("");
+    setResult(null);
+    try {
+      // Lazy import keeps ExcelJS + calendar data out of the initial page load.
+      const { enrichTargetWorkbook } = await import("./lib/enrichTargetSheet.js");
+      const arrayBuffer = await file.arrayBuffer();
+      const { buffer, sheets, totalRows } = await enrichTargetWorkbook(arrayBuffer, { zone });
+
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const base = file.name.replace(/\.xlsx$/i, "");
+      const filename = `${base}__1Group_Calendar_2026.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setResult({ sheets, totalRows, filename });
+      setPhase("done");
+    } catch (e) {
+      console.error("Target sheet enrichment failed:", e);
+      setError(e?.message || "Could not process this file. Please check it is a valid .xlsx workbook.");
+      setPhase("error");
+    }
+  };
+
+  const zoneLabel = (z) => (z === "group" ? "1-Group (all venues)" : (VENUE_HC_RAW[z]?.name || z));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`absolute inset-0 ${t.overlayBg}`} />
+      <div className={`relative ${t.panel} border rounded-xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl`} onClick={e => e.stopPropagation()}>
+        <div className={`sticky top-0 ${t.panel} border-b p-4 flex items-center justify-between z-10`}>
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+            <h3 className={`font-bold text-sm ${t.textHead}`}>Enrich Your Target Sheet</h3>
+          </div>
+          <button onClick={onClose} className={`p-1 rounded-lg ${t.surfaceHover}`}><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <p className={`text-xs ${t.textMuted}`}>
+            Upload your Excel target sheet and the app adds the 2026 marketing calendar to every
+            date-based tab as extra columns on the right. Your existing numbers, formulas and
+            formatting are left untouched — nothing is overwritten.
+          </p>
+
+          {/* Columns that will be added */}
+          <div className={`rounded-lg border ${t.border} p-3`}>
+            <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-2`}>Columns added per day</div>
+            <div className="flex flex-wrap gap-1.5">
+              {ADDED_COLUMNS.map(c => (
+                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{c}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Zone selector */}
+          <div>
+            <label className={`block text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1.5`}>
+              Venue overlay (demand heat map &amp; venue activities)
+            </label>
+            <select
+              value={zone}
+              onChange={e => setZone(e.target.value)}
+              className={`${t.input} border rounded-md px-2 py-1.5 text-xs w-full focus:outline-none focus:border-indigo-500`}
+            >
+              {zones.map(z => (
+                <option key={z} value={z}>{zoneLabel(z)}</option>
+              ))}
+            </select>
+            <p className={`text-[11px] ${t.textDim} mt-1`}>
+              Holidays, SG &amp; MICE events, campaigns and visitor peaks are group-wide. The Hot/Cold demand
+              heat map and venue activities follow the venue you pick here.
+            </p>
+          </div>
+
+          {/* File picker */}
+          <div>
+            <label className={`block text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1.5`}>Target workbook (.xlsx)</label>
+            <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed ${t.borderSoft} ${t.surfaceHover} px-3 py-3 text-xs ${t.textBody}`}>
+              <Upload className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="truncate">{file ? file.name : "Choose an .xlsx file to upload…"}</span>
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden"
+                onChange={e => pickFile(e.target.files?.[0])}
+              />
+            </label>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border text-xs" style={{ borderColor: "#FCA5A5", background: "#FEF2F2", color: "#991B1B" }}>
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {phase === "done" && result && (
+            <div className="p-3 rounded-lg border text-xs" style={{ borderColor: "#6EE7B7", background: "#ECFDF5", color: "#065F46" }}>
+              <div className="flex items-center gap-2 font-semibold mb-1">
+                <Check className="w-4 h-4" /> Downloaded {result.filename}
+              </div>
+              <div>
+                Enriched {result.sheets.length} tab{result.sheets.length === 1 ? "" : "s"} ({result.totalRows} day rows):{" "}
+                {result.sheets.map(s => `${s.name} (${s.rows})`).join(", ")}.
+              </div>
+              <div className="mt-1 opacity-80">Only 2026 dates carry calendar data; any 2027 rows are left blank.</div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button onClick={onClose} className={`text-xs px-3 py-1.5 rounded-md ${t.surfaceStrong} ${t.surfaceStrongHover}`}>
+              {phase === "done" ? "Close" : "Cancel"}
+            </button>
+            <button
+              onClick={run}
+              disabled={!file || phase === "working"}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md text-white ${(!file || phase === "working") ? "bg-indigo-300 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"}`}
+            >
+              {phase === "working"
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing…</>
+                : <><Download className="w-3.5 h-3.5" /> Add Calendar &amp; Download</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function VenueCodesPanel({ t, onClose }) {
   const [copied, setCopied] = useState(null);
