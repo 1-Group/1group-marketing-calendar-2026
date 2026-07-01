@@ -2400,13 +2400,13 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  // Kept in sync with ENRICHMENT_COLUMNS in src/lib/enrichTargetSheet.js.
+  // Kept in sync with FRONT_COLUMNS / TAIL_COLUMNS in src/lib/enrichTargetSheet.js.
   // Duplicated here (rather than imported) so the heavy ExcelJS-backed module
   // stays lazily loaded and out of the main bundle until the user actually runs it.
-  const ADDED_COLUMNS = [
-    "Demand (Hot/Cold)", "Public Holiday", "School Holiday", "SG Events",
-    "MICE Events", "1-Group Campaigns", "Venue Activities", "Visitor Peaks",
-  ];
+  // Inserted right after the Date column:
+  const FRONT_ADDED = ["Demand (Hot/Cold)", "SG Events", "MICE Events", "Visitor Peaks"];
+  // Appended at the far right:
+  const TAIL_ADDED = ["1-Group Campaigns", "Venue Activities"];
 
   const zones = (Array.isArray(venueKeys) && venueKeys.length ? venueKeys : VENUE_KEYS);
 
@@ -2474,19 +2474,33 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
 
         <div className="p-4 space-y-4">
           <p className={`text-xs ${t.textMuted}`}>
-            Upload your Excel target sheet and the app adds the 2026 marketing calendar to every
-            date-based tab as extra columns on the right. Your existing numbers, formulas and
-            formatting are left untouched — nothing is overwritten.
+            Upload your Excel target sheet and the app folds the 2026 marketing calendar into every
+            date-based tab, keyed off each daily date. Your existing numbers and formulas are
+            preserved — the financial formulas are automatically re-pointed for the new columns, so
+            every sum and total still works.
           </p>
 
           {/* Columns that will be added */}
-          <div className={`rounded-lg border ${t.border} p-3`}>
-            <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-2`}>Columns added per day</div>
-            <div className="flex flex-wrap gap-1.5">
-              {ADDED_COLUMNS.map(c => (
-                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{c}</span>
-              ))}
+          <div className={`rounded-lg border ${t.border} p-3 space-y-2`}>
+            <div>
+              <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1.5`}>Inserted after the Date column</div>
+              <div className="flex flex-wrap gap-1.5">
+                {FRONT_ADDED.map(c => (
+                  <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{c}</span>
+                ))}
+              </div>
             </div>
+            <div>
+              <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1.5`}>Appended at the far right</div>
+              <div className="flex flex-wrap gap-1.5">
+                {TAIL_ADDED.map(c => (
+                  <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{c}</span>
+                ))}
+              </div>
+            </div>
+            <p className={`text-[11px] ${t.textDim}`}>
+              Public &amp; school holidays are merged into your existing <strong>Event</strong> column.
+            </p>
           </div>
 
           {/* Zone selector */}
