@@ -1,38 +1,19 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText, Download, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 
-// ─── AUTH: USERS + ACCESS CODES ───
-// NOTE: Client-side soft gate only. Anyone with DevTools can read this file.
-// Protects against casual access, not determined attackers. For true auth,
-// use Vercel's Workspace-domain protection or a server-side OAuth flow.
+// ─── AUTH ───
+// Sign-in is a single email→OTP flow (see SignIn below + /api/auth/*). The
+// approved member allowlist lives server-side in Redis and is managed in-app by
+// master admins via the Members panel (/api/admin/members). The frontend never
+// gates access itself — it trusts the HMAC-signed user object returned by
+// /api/auth/verify-otp, whose role is one of: master | admin | user | venue.
 
-const AUTH_USERS = {
-  // Master admin
-  "chris.millar@1-group.sg": { role: "master", name: "Chris Millar", dept: "Leadership" },
-  // Marketing — can edit
-  "guiying.chua@1-group.sg": { role: "admin", name: "Guiying Chua", dept: "Marketing" },
-  "praveena.gunasegaran@1-group.sg": { role: "admin", name: "Praveena Gunasegaran", dept: "Marketing" },
-  "immelia.izalena@1-group.sg": { role: "admin", name: "Immelia Izalena", dept: "Marketing" },
-  "jessie.tan@1-group.sg": { role: "admin", name: "Jessie Tan", dept: "Marketing" },
-  "audrey.ng@1-group.sg": { role: "admin", name: "Audrey Ng", dept: "Marketing" },
-  "daryl.xie@1-group.sg": { role: "admin", name: "Daryl Xie", dept: "Marketing" },
-  // Sales — can edit
-  "eileen.tan@1-group.sg": { role: "admin", name: "Eileen Tan", dept: "Sales" },
-  "janet.sim@1-group.sg": { role: "admin", name: "Janet Sim", dept: "Sales" },
-  "alvin.chua@1-group.sg": { role: "admin", name: "Alvin Chua", dept: "Sales" },
-  // Operations — read-only
-  "joseph.ong@1-group.sg": { role: "staff", name: "Joseph Ong", dept: "Operations" },
-  "massimo.aquaro@1-group.sg": { role: "staff", name: "Massimo Aquaro", dept: "Operations" },
-  "alessandro.rosa@1-group.sg": { role: "staff", name: "Alessandro Rosa", dept: "Operations" },
-  "davide.carella@1-group.sg": { role: "staff", name: "Davide Carella", dept: "Operations" },
-  "kumar.k@1-group.sg": { role: "staff", name: "Kumar K", dept: "Operations" },
-  "ruzaini.hashim@1-group.sg": { role: "staff", name: "Ruzaini Hashim", dept: "Operations" },
-  // Culinary — read-only
-  "tom.kung@1-group.sg": { role: "staff", name: "Tom Kung", dept: "Culinary" },
-  "felix.chong@1-group.sg": { role: "staff", name: "Felix Chong", dept: "Culinary" },
-};
+// Roles the server can assign (member tier → frontend role):
+//   master (Master) · admin (Editor) · user (Viewer) · venue (Outlet, venue-scoped)
+const ROLE_LABEL = { master: "Master admin", admin: "Editor", user: "Viewer", staff: "Viewer", venue: "Outlet" };
 
-// Static per-venue access codes. Admins share these with outlet staff.
+// Static per-venue access codes — legacy reference only (kept for the deprecated
+// Venue Codes panel; no longer used for sign-in, which is now email→OTP).
 const VENUE_ACCESS_CODES = {
   summerhouse: "SMH-2026-X7K2",
   garage: "GAR-2026-M9P4",
@@ -45,19 +26,6 @@ const VENUE_ACCESS_CODES = {
   flowerhill: "FLW-2026-L1K7",
   monti: "MON-2026-C3S2",
 };
-
-function authEmail(raw) {
-  const email = (raw || "").trim().toLowerCase();
-  if (!email.endsWith("@1-group.sg")) return null;
-  return AUTH_USERS[email] ? { email, ...AUTH_USERS[email] } : null;
-}
-
-function authVenueCode(venueKey, code) {
-  const c = (code || "").trim().toUpperCase();
-  if (!VENUE_ACCESS_CODES[venueKey]) return null;
-  if (VENUE_ACCESS_CODES[venueKey] !== c) return null;
-  return { role: "venue", venue: venueKey, name: `${VENUE_HC_RAW[venueKey]?.name || venueKey} Staff`, dept: "Outlet" };
-}
 
 function canEdit(user) { return user && (user.role === "master" || user.role === "admin"); }
 // canAdd: who can OPEN the Add Event form.
@@ -171,6 +139,7 @@ export default function MarketingCalendar() {
   const [showVenueCodes, setShowVenueCodes] = useState(false);
   const [showAccessLog, setShowAccessLog] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const t = T;
@@ -194,18 +163,15 @@ export default function MarketingCalendar() {
     (async () => {
       try {
         // Restore session
+        // Restore session — trust the user object stored at the last OTP sign-in.
+        // (The session token is HMAC-verified server-side on any privileged call.)
         const sess = await storage.get("calendar-user");
         if (sess?.value) {
           const u = JSON.parse(sess.value);
-          // Re-validate against current allowlist
-          if (u.email && AUTH_USERS[u.email]) {
-            const restored = { email: u.email, ...AUTH_USERS[u.email] };
-            setUser(restored);
-            logAccess(restored);
-          } else if (u.role === "venue" && u.venue && VENUE_HC_RAW[u.venue]) {
+          if (u && u.role) {
             setUser(u);
-            setSelectedZone(u.venue);
             logAccess(u);
+            if (u.role === "venue" && u.venue && VENUE_HC_RAW[u.venue]) setSelectedZone(u.venue);
           }
         }
         const saved = await storage.get("calendar-events");
@@ -855,6 +821,7 @@ export default function MarketingCalendar() {
                 ><Download className="w-3.5 h-3.5" /> {activeVenue.shortName} .xlsx</button>
               )}
               {codesOK && <button onClick={() => setShowVenueCodes(true)} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><KeyRound className="w-3.5 h-3.5" /> Venue Codes</button>}
+              {logOK && <button onClick={() => setShowMembers(true)} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Users className="w-3.5 h-3.5" /> Members</button>}
               {logOK && <button onClick={() => setShowAccessLog(true)} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Eye className="w-3.5 h-3.5" /> Access Log</button>}
               {editOK && <button onClick={handleReset} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><RotateCcw className="w-3.5 h-3.5" /> Reset</button>}
               <button onClick={handleSignOut} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><LogOut className="w-3.5 h-3.5" /> Sign out</button>
@@ -1169,6 +1136,7 @@ export default function MarketingCalendar() {
 
       {showVenueCodes && codesOK && <VenueCodesPanel t={t} onClose={() => setShowVenueCodes(false)} />}
       {showAccessLog && logOK && <AccessLogPanel t={t} onClose={() => setShowAccessLog(false)} />}
+      {showMembers && logOK && <MemberSettingsPanel t={t} currentUser={user} onClose={() => setShowMembers(false)} />}
       {showUpload && (
         <TargetSheetUpload
           t={t}
@@ -2047,65 +2015,37 @@ function EventFormModal({ t, user, event, isPrefill, onSave, onClose }) {
 // ─── SIGN-IN PAGE ───
 
 function SignIn({ t, onSignIn }) {
-  const [mode, setMode] = useState("email"); // 'email' (admin) | 'otp' (group OTP) | 'venue' (outlet OTP)
-  const [email, setEmail] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState("email"); // 'email' (request code) | 'code' (enter code)
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [challenge, setChallenge] = useState(null);
+  const [sentMsg, setSentMsg] = useState(null);
 
-  // Shared OTP flow state — used for both 'otp' (group) and 'venue' (outlet) modes.
-  // The mode flag tells the request handler whether to include the outlet flag in the API call.
-  const [otpStep, setOtpStep] = useState("email"); // 'email' (request) | 'code' (enter received OTP)
-  const [otpEmail, setOtpEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpChallenge, setOtpChallenge] = useState(null);
-  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
-  const [otpSentMsg, setOtpSentMsg] = useState(null);
-
-  const handleEmail = () => {
+  // Step 1 — request a one-time code.
+  const requestCode = async () => {
     setErr(null);
-    const u = authEmail(email);
-    if (!u) {
-      if (!email.toLowerCase().endsWith("@1-group.sg")) setErr("Only @1-group.sg email addresses are accepted.");
-      else setErr("This email is not on the access list. Try the Group Access tab instead, or contact a Marketing admin.");
-      return;
-    }
-    setBusy(true);
-    onSignIn(u);
-  };
-
-  // (Note: the old code-based handleVenue was removed — outlet sign-in now uses the
-  //  shared OTP flow below, which branches on `mode === "venue"` to send the outlet flag.)
-
-  // OTP step 1: request a code (works for both 'otp' and 'venue' modes)
-  const handleOtpRequest = async () => {
-    setErr(null);
-    const trimmed = otpEmail.trim().toLowerCase();
-    if (!/^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(trimmed)) {
-      setErr("Please enter a valid email address.");
-      return;
-    }
-    if (!trimmed.endsWith("@1-group.sg")) {
-      setErr("Only @1-group.sg email addresses are accepted.");
+    const trimmed = email.trim().toLowerCase();
+    if (!/^[a-z0-9._+-]+@1-group\.sg$/i.test(trimmed)) {
+      setErr("Enter your @1-group.sg email address.");
       return;
     }
     setBusy(true);
     try {
-      const reqBody = { email: trimmed };
-      if (mode === "venue") reqBody.outlet = true;
       const resp = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(reqBody),
+        body: JSON.stringify({ email: trimmed }),
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
         setErr(data.error || "Could not send code. Please try again.");
         return;
       }
-      setOtpChallenge(data.challenge);
-      setOtpExpiresAt(data.expiresAt);
-      setOtpSentMsg(`Code sent to ${trimmed}. Check your inbox (and spam folder).`);
-      setOtpStep("code");
+      setChallenge(data.challenge);
+      setSentMsg(`Code sent to ${trimmed}. Check your inbox (and spam folder).`);
+      setStep("code");
     } catch (e) {
       setErr("Network error. Please check your connection and try again.");
     } finally {
@@ -2113,28 +2053,17 @@ function SignIn({ t, onSignIn }) {
     }
   };
 
-  // OTP step 2: verify the code
-  const handleOtpVerify = async () => {
+  // Step 2 — verify the code.
+  const verifyCode = async () => {
     setErr(null);
-    if (!/^\d{6}$/.test(otpCode.trim())) {
-      setErr("Code must be 6 digits.");
-      return;
-    }
-    if (!otpChallenge) {
-      setErr("No active code request. Please request a new code.");
-      setOtpStep("email");
-      return;
-    }
+    if (!/^\d{6}$/.test(code.trim())) { setErr("Code must be 6 digits."); return; }
+    if (!challenge) { setErr("No active code request. Request a new code."); setStep("email"); return; }
     setBusy(true);
     try {
       const resp = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: otpEmail.trim().toLowerCase(),
-          code: otpCode.trim(),
-          challenge: otpChallenge,
-        }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), code: code.trim(), challenge }),
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
@@ -2142,7 +2071,6 @@ function SignIn({ t, onSignIn }) {
         setBusy(false);
         return;
       }
-      // Optionally store session token for future server-side re-verification
       try { localStorage.setItem("calendar-otp-session", data.sessionToken); } catch {}
       onSignIn(data.user);
     } catch (e) {
@@ -2151,15 +2079,7 @@ function SignIn({ t, onSignIn }) {
     }
   };
 
-  const resetOtp = () => {
-    setOtpStep("email");
-    setOtpCode("");
-    setOtpChallenge(null);
-    setOtpExpiresAt(null);
-    setOtpSentMsg(null);
-    setErr(null);
-  };
-
+  const reset = () => { setStep("email"); setCode(""); setChallenge(null); setSentMsg(null); setErr(null); };
   const onKey = (fn) => (e) => { if (e.key === "Enter") fn(); };
 
   return (
@@ -2177,195 +2097,70 @@ function SignIn({ t, onSignIn }) {
         <div className={`${t.panel} border rounded-xl p-6 shadow-sm`}>
           <div className="flex items-center gap-2 mb-4">
             <Lock className={`w-4 h-4 ${t.textMuted}`} />
-            <h2 className={`text-sm font-semibold ${t.textHead}`}>Sign in to continue</h2>
+            <h2 className={`text-sm font-semibold ${t.textHead}`}>Sign in with your 1-Group email</h2>
           </div>
 
-          {/* Mode toggle — three tabs */}
-          <div className="flex gap-1 mb-4 p-1 bg-slate-100 rounded-md">
-            <button
-              onClick={() => { setMode("email"); setErr(null); }}
-              className={`flex-1 text-xs py-1.5 rounded transition-all flex items-center justify-center gap-1 ${mode === "email" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600"}`}
-            >
-              <Shield className="w-3.5 h-3.5" /> Admin
-            </button>
-            <button
-              onClick={() => { setMode("otp"); setErr(null); resetOtp(); }}
-              className={`flex-1 text-xs py-1.5 rounded transition-all flex items-center justify-center gap-1 ${mode === "otp" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600"}`}
-            >
-              <KeyRound className="w-3.5 h-3.5" /> Group Access
-            </button>
-            <button
-              onClick={() => { setMode("venue"); setErr(null); resetOtp(); }}
-              className={`flex-1 text-xs py-1.5 rounded transition-all flex items-center justify-center gap-1 ${mode === "venue" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600"}`}
-            >
-              <Building2 className="w-3.5 h-3.5" /> Outlet
-            </button>
-          </div>
-
-          {mode === "email" && (
+          {step === "email" ? (
             <>
               <p className={`text-xs ${t.textMuted} mb-3 leading-relaxed`}>
-                For <strong>admins</strong> on the access list (Leadership, Marketing, Sales, Operations, Culinary). Your role is assigned automatically from your email address.
+                Enter your <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">@1-group.sg</code> email and we'll send a
+                6-digit sign-in code. Access and your view are set by the Marketing team — if you're not on the list yet, ask a master admin to add you.
               </p>
               <label className={`text-xs ${t.textMuted} block mb-1`}>1-Group email address</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                onKeyDown={onKey(handleEmail)}
+                onKeyDown={onKey(requestCode)}
                 placeholder="firstname.lastname@1-group.sg"
                 autoFocus
+                disabled={busy}
                 className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-purple-500 mb-3`}
               />
               <button
-                onClick={handleEmail}
-                disabled={busy}
+                onClick={requestCode}
+                disabled={busy || !email.trim()}
                 className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
               >
-                <Shield className="w-4 h-4" /> Sign in
+                <KeyRound className="w-4 h-4" /> {busy ? "Sending…" : "Send sign-in code"}
               </button>
-              <p className={`text-xs ${t.textDim} mt-3 text-center`}>
-                Not on the admin list? Use the <strong>Group Access</strong> tab if you have group-list access, or the <strong>Outlet</strong> tab if you're outlet staff.
-              </p>
             </>
-          )}
-
-          {mode === "otp" && (
+          ) : (
             <>
-              <p className={`text-xs ${t.textMuted} mb-3 leading-relaxed`}>
-                For all <strong>1-Group staff</strong> with a <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">@1-group.sg</code> email <strong>on the group access list</strong>. We'll send a one-time code to your inbox. Read-only access to all venues.
-              </p>
-
-              {otpStep === "email" ? (
-                <>
-                  <label className={`text-xs ${t.textMuted} block mb-1`}>Your 1-Group email</label>
-                  <input
-                    type="email"
-                    value={otpEmail}
-                    onChange={e => setOtpEmail(e.target.value)}
-                    onKeyDown={onKey(handleOtpRequest)}
-                    placeholder="firstname.lastname@1-group.sg"
-                    autoFocus
-                    disabled={busy}
-                    className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 mb-3`}
-                  />
-                  <button
-                    onClick={handleOtpRequest}
-                    disabled={busy || !otpEmail.trim()}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
-                  >
-                    <KeyRound className="w-4 h-4" /> {busy ? "Sending…" : "Send sign-in code"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  {otpSentMsg && (
-                    <div className="mb-3 flex items-start gap-2 p-2.5 rounded bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
-                      <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      <span>{otpSentMsg}</span>
-                    </div>
-                  )}
-                  <label className={`text-xs ${t.textMuted} block mb-1`}>6-digit code from your email</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    onKeyDown={onKey(handleOtpVerify)}
-                    placeholder="123456"
-                    autoFocus
-                    disabled={busy}
-                    className={`w-full ${t.input} border rounded-md px-3 py-3 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:border-emerald-500 mb-3`}
-                  />
-                  <button
-                    onClick={handleOtpVerify}
-                    disabled={busy || otpCode.length !== 6}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
-                  >
-                    <Check className="w-4 h-4" /> {busy ? "Verifying…" : "Verify and sign in"}
-                  </button>
-                  <button
-                    onClick={resetOtp}
-                    disabled={busy}
-                    className={`w-full text-xs ${t.textMuted} hover:${t.textBody} mt-2 underline-offset-2 hover:underline`}
-                  >
-                    Use a different email
-                  </button>
-                </>
+              {sentMsg && (
+                <div className="mb-3 flex items-start gap-2 p-2.5 rounded bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{sentMsg}</span>
+                </div>
               )}
-            </>
-          )}
-
-          {mode === "venue" && (
-            <>
-              <p className={`text-xs ${t.textMuted} mb-3 leading-relaxed`}>
-                For <strong>outlet-based team members</strong> on the Marketing-managed allowlist. We'll send a 6-digit code to your <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">@1-group.sg</code> email. Access is scoped to your outlet's view only.
-              </p>
-
-              {otpStep === "email" ? (
-                <>
-                  <label className={`text-xs ${t.textMuted} block mb-1`}>Your 1-Group email</label>
-                  <input
-                    type="email"
-                    value={otpEmail}
-                    onChange={e => setOtpEmail(e.target.value)}
-                    onKeyDown={onKey(handleOtpRequest)}
-                    placeholder="firstname.lastname@1-group.sg"
-                    autoFocus
-                    disabled={busy}
-                    className={`w-full ${t.input} border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 mb-3`}
-                  />
-                  <button
-                    onClick={handleOtpRequest}
-                    disabled={busy || !otpEmail.trim()}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
-                  >
-                    <KeyRound className="w-4 h-4" /> {busy ? "Sending…" : "Send sign-in code"}
-                  </button>
-                  <p className={`text-xs ${t.textDim} mt-3 text-center`}>
-                    Not on the outlet allowlist? Contact the Marketing team to request access.
-                  </p>
-                </>
-              ) : (
-                <>
-                  {otpSentMsg && (
-                    <div className="mb-3 flex items-start gap-2 p-2.5 rounded bg-indigo-50 border border-indigo-200 text-xs text-indigo-800">
-                      <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      <span>{otpSentMsg}</span>
-                    </div>
-                  )}
-                  <label className={`text-xs ${t.textMuted} block mb-1`}>6-digit code from your email</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    onKeyDown={onKey(handleOtpVerify)}
-                    placeholder="123456"
-                    autoFocus
-                    disabled={busy}
-                    className={`w-full ${t.input} border rounded-md px-3 py-3 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:border-indigo-500 mb-3`}
-                  />
-                  <button
-                    onClick={handleOtpVerify}
-                    disabled={busy || otpCode.length !== 6}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
-                  >
-                    <Check className="w-4 h-4" /> {busy ? "Verifying…" : "Verify and enter outlet view"}
-                  </button>
-                  <button
-                    onClick={resetOtp}
-                    disabled={busy}
-                    className={`w-full text-xs ${t.textMuted} hover:${t.textBody} mt-2 underline-offset-2 hover:underline`}
-                  >
-                    Use a different email
-                  </button>
-                </>
-              )}
+              <label className={`text-xs ${t.textMuted} block mb-1`}>6-digit code from your email</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={onKey(verifyCode)}
+                placeholder="123456"
+                autoFocus
+                disabled={busy}
+                className={`w-full ${t.input} border rounded-md px-3 py-3 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:border-purple-500 mb-3`}
+              />
+              <button
+                onClick={verifyCode}
+                disabled={busy || code.length !== 6}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm py-2 rounded-md font-medium flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" /> {busy ? "Verifying…" : "Verify and sign in"}
+              </button>
+              <button
+                onClick={reset}
+                disabled={busy}
+                className={`w-full text-xs ${t.textMuted} hover:${t.textBody} mt-2 underline-offset-2 hover:underline`}
+              >
+                Use a different email
+              </button>
             </>
           )}
 
@@ -2578,6 +2373,224 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
   );
 }
 
+// ─── MEMBER SETTINGS PANEL (master admins only) ───
+// Master admins grant / revoke / re-tier access here. Reads and writes the
+// server-side allowlist via /api/admin/members, authenticated by the caller's
+// signed session token. Changes take effect at each member's next sign-in.
+function MemberSettingsPanel({ t, currentUser, onClose }) {
+  const [members, setMembers] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [form, setForm] = useState({ email: "", tier: "viewer", name: "", dept: "", venues: [] });
+
+  const TIERS = [
+    { key: "master", label: "Master", desc: "Full control + this panel", color: "#7c3aed" },
+    { key: "editor", label: "Editor", desc: "View all · add & edit events", color: "#4f46e5" },
+    { key: "viewer", label: "Viewer", desc: "View all · read-only", color: "#0891b2" },
+    { key: "outlet", label: "Outlet", desc: "Their venue(s) only", color: "#d97706" },
+  ];
+  const tierMeta = (k) => TIERS.find(x => x.key === k) || { label: k, color: "#64748b" };
+  const venueKeys = VENUE_KEYS.filter(v => v !== "group");
+
+  const token = (() => { try { return localStorage.getItem("calendar-otp-session"); } catch { return null; } })();
+
+  const call = async (action, payload = {}) => {
+    const resp = await fetch("/api/admin/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, token, ...payload }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || "Request failed.");
+    return data;
+  };
+
+  const load = async () => {
+    setLoading(true); setErr("");
+    try { const d = await call("list"); setMembers(d.members); }
+    catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  const upsert = async (member) => {
+    setBusy(true); setErr("");
+    try { const d = await call("upsert", { email: member.email, member }); setMembers(d.members); return true; }
+    catch (e) { setErr(e.message); return false; }
+    finally { setBusy(false); }
+  };
+  const remove = async (email) => {
+    if (!confirm(`Remove ${email}?\n\nThey'll lose access the next time they try to sign in.`)) return;
+    setBusy(true); setErr("");
+    try { const d = await call("remove", { email }); setMembers(d.members); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const resetForm = () => setForm({ email: "", tier: "viewer", name: "", dept: "", venues: [] });
+  const editRow = (m) => { setForm({ email: m.email, tier: m.tier, name: m.name || "", dept: m.dept || "", venues: [...(m.venues || [])] }); setErr(""); };
+  const toggleVenue = (v) => setForm(f => ({ ...f, venues: f.venues.includes(v) ? f.venues.filter(x => x !== v) : [...f.venues, v] }));
+
+  const save = async () => {
+    const email = form.email.trim().toLowerCase();
+    if (!/^[a-z0-9._+-]+@1-group\.sg$/i.test(email)) { setErr("Enter a valid @1-group.sg email address."); return; }
+    if (form.tier === "outlet" && form.venues.length === 0) { setErr("Pick at least one venue for an Outlet member."); return; }
+    const ok = await upsert({ email, tier: form.tier, name: form.name.trim(), dept: form.dept.trim(), venues: form.tier === "outlet" ? form.venues : [] });
+    if (ok) resetForm();
+  };
+
+  const existingEmails = new Set((members || []).map(m => m.email));
+  const isEditing = existingEmails.has(form.email.trim().toLowerCase());
+  const q = search.trim().toLowerCase();
+  const filtered = (members || []).filter(m => !q || m.email.includes(q) || (m.name || "").toLowerCase().includes(q));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`absolute inset-0 ${t.overlayBg}`} />
+      <div className={`relative ${t.panel} border rounded-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto shadow-xl`} onClick={e => e.stopPropagation()}>
+        <div className={`sticky top-0 ${t.panel} border-b p-4 flex items-center justify-between z-10`}>
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-indigo-600" />
+            <h3 className={`font-bold text-sm ${t.textHead}`}>Members &amp; Access</h3>
+            {members && <span className={`text-xs ${t.textDim}`}>· {members.length} people</span>}
+          </div>
+          <button onClick={onClose} className={`p-1 rounded-lg ${t.surfaceHover}`}><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Add / edit form */}
+          <div className={`rounded-lg border ${t.border} p-3`}>
+            <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-2`}>
+              {isEditing ? "Update member" : "Add a team member"}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="firstname.lastname@1-group.sg"
+                className={`${t.input} border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 sm:col-span-2`}
+              />
+              <input
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Name (optional)"
+                className={`${t.input} border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500`}
+              />
+              <input
+                value={form.dept}
+                onChange={e => setForm(f => ({ ...f, dept: e.target.value }))}
+                placeholder="Department (optional)"
+                className={`${t.input} border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500`}
+              />
+            </div>
+            {/* Tier picker */}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {TIERS.map(tier => (
+                <button
+                  key={tier.key}
+                  onClick={() => setForm(f => ({ ...f, tier: tier.key }))}
+                  title={tier.desc}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${form.tier === tier.key ? "text-white" : `${t.textBody} ${t.chipInactiveBorder}`}`}
+                  style={form.tier === tier.key ? { background: tier.color, borderColor: tier.color } : {}}
+                >
+                  {tier.label}
+                </button>
+              ))}
+            </div>
+            <p className={`text-[11px] ${t.textDim} mt-1`}>{tierMeta(form.tier).desc}</p>
+            {/* Venue picker (outlet only) */}
+            {form.tier === "outlet" && (
+              <div className="mt-2">
+                <div className={`text-[11px] ${t.textMuted} mb-1`}>Venues this person can see:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {venueKeys.map(v => (
+                    <button
+                      key={v}
+                      onClick={() => toggleVenue(v)}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border ${form.venues.includes(v) ? "bg-amber-100 border-amber-400 text-amber-800" : `${t.chipInactiveBorder} ${t.textDim}`}`}
+                    >
+                      {VENUE_HC_RAW[v]?.shortName || v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                onClick={save}
+                disabled={busy || !form.email.trim()}
+                className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-md text-white ${busy || !form.email.trim() ? "bg-indigo-300 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"}`}
+              >
+                {isEditing ? <><Check className="w-3.5 h-3.5" /> Update access</> : <><Plus className="w-3.5 h-3.5" /> Grant access</>}
+              </button>
+              {form.email && (
+                <button onClick={resetForm} className={`text-xs px-3 py-1.5 rounded-md ${t.surfaceStrong} ${t.surfaceStrongHover}`}>Clear</button>
+              )}
+            </div>
+          </div>
+
+          {err && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border text-xs" style={{ borderColor: "#FCA5A5", background: "#FEF2F2", color: "#991B1B" }}>
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /><span>{err}</span>
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="relative">
+            <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${t.textDim}`} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search members…" className={`${t.input} border rounded-md pl-7 pr-3 py-1.5 text-xs w-full focus:outline-none focus:border-indigo-500`} />
+          </div>
+
+          {/* Member list grouped by tier */}
+          {loading ? (
+            <div className={`text-sm ${t.textDim} py-6 text-center animate-pulse`}>Loading members…</div>
+          ) : (
+            TIERS.map(tier => {
+              const rows = filtered.filter(m => m.tier === tier.key);
+              if (rows.length === 0) return null;
+              return (
+                <div key={tier.key}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" style={{ background: tier.color + "22", color: tier.color }}>{tier.label}</span>
+                    <span className={`text-[11px] ${t.textDim}`}>{rows.length}</span>
+                  </div>
+                  <div className={`rounded-lg border ${t.border} divide-y ${t.divide} mb-1`}>
+                    {rows.map(m => (
+                      <div key={m.email} className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className={`text-xs font-medium ${t.textBody} truncate`}>
+                            {m.name || m.email.split("@")[0]}
+                            {m.email === currentUser.email && <span className={`ml-1 text-[10px] ${t.textDim}`}>(you)</span>}
+                          </div>
+                          <div className={`text-[11px] ${t.textDim} truncate`}>
+                            {m.email}{m.dept ? ` · ${m.dept}` : ""}
+                            {m.tier === "outlet" && m.venues?.length ? ` · ${m.venues.map(v => VENUE_HC_RAW[v]?.shortName || v).join(", ")}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => editRow(m)} disabled={busy} className={`text-[11px] px-2 py-1 rounded ${t.surfaceStrong} ${t.surfaceStrongHover} flex items-center gap-1`}><Edit className="w-3 h-3" /> Edit</button>
+                          <button onClick={() => remove(m.email)} disabled={busy || m.email === currentUser.email} className={`text-[11px] px-2 py-1 rounded flex items-center gap-1 ${m.email === currentUser.email ? "opacity-40 cursor-not-allowed" : "text-red-600 hover:bg-red-50"}`}><Trash2 className="w-3 h-3" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          <p className={`text-[11px] ${t.textDim} leading-relaxed`}>
+            Access changes take effect at the member's next sign-in. Everyone signs in with a one-time code sent to their
+            <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded mx-1">@1-group.sg</code> email — there are no passwords to manage.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VenueCodesPanel({ t, onClose }) {
   const [copied, setCopied] = useState(null);
   const copyCode = (code) => {
@@ -2599,7 +2612,7 @@ function VenueCodesPanel({ t, onClose }) {
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#B45309" }} />
               <div className={`text-xs ${t.textBody}`}>
-                <strong style={{ color: "#92400E" }}>These codes no longer authenticate sign-in.</strong> Outlet access has moved to email-based OTP. To grant a new outlet user access, edit <code className="text-[11px] bg-white px-1 py-0.5 rounded border">api/auth/send-otp.js</code> and add their email + venue array to the <code className="text-[11px] bg-white px-1 py-0.5 rounded border">OUTLET_ALLOWLIST</code> object. The codes below remain only as historical reference and may be removed in a future release.
+                <strong style={{ color: "#92400E" }}>These codes no longer authenticate sign-in.</strong> Outlet access has moved to email-based OTP. To grant a new outlet user access, open the <strong>Members</strong> panel, add their <code className="text-[11px] bg-white px-1 py-0.5 rounded border">@1-group.sg</code> email, set their access level to <strong>Outlet</strong> and pick their venue(s) — no code change needed. The codes below remain only as historical reference and may be removed in a future release.
               </div>
             </div>
           </div>
