@@ -430,9 +430,38 @@ function enrichSheet(ws, layout, forDate) {
   const merges = [...(ws.model.merges || [])];
   merges.forEach((m) => { try { ws.unMergeCells(m); } catch { /* not merged */ } });
 
+  // 1b. Capture column definitions (width / hidden / outline / style). ExcelJS's
+  //     spliceColumns moves cell VALUES but leaves column DEFINITIONS pinned to
+  //     their index, so without this the hidden flags and widths end up misaligned
+  //     — e.g. a column the user had hidden would hide one of our new columns.
+  const preCols = ws.columnCount;
+  const colDefs = [];
+  for (let c = 1; c <= preCols; c++) {
+    const col = ws.getColumn(c);
+    colDefs.push({ width: col.width, hidden: col.hidden, outlineLevel: col.outlineLevel, style: col.style });
+  }
+
   // 2. Insert `count` blank columns right after the Date column. (Formulas were
   //    already reflowed workbook-wide before this, so shifted cells stay correct.)
   ws.spliceColumns(insertAt, 0, ...Array.from({ length: count }, () => []));
+
+  // 2b. Re-apply column definitions at their shifted positions (defs at/after the
+  //     insert point move by `count`), then make the inserted columns visible.
+  for (let c = 1; c <= preCols; c++) {
+    const def = colDefs[c - 1];
+    const target = c >= insertAt ? c + count : c;
+    const tcol = ws.getColumn(target);
+    tcol.width = def.width;
+    tcol.hidden = !!def.hidden;
+    tcol.outlineLevel = def.outlineLevel || 0;
+    if (def.style) tcol.style = def.style;
+  }
+  for (let c = insertAt; c < insertAt + count; c++) {
+    const col = ws.getColumn(c);
+    col.hidden = false;
+    col.outlineLevel = 0;
+    col.style = {};
+  }
 
   // 3. Re-merge with shifted ranges.
   merges.forEach((m) => {
@@ -456,6 +485,7 @@ function enrichSheet(ws, layout, forDate) {
     styleHeaderCell(ws.getRow(headerRow).getCell(c));
     ws.getRow(headerRow).getCell(c).value = col.label;
     const column = ws.getColumn(c);
+    column.hidden = false;
     if (!column.width || column.width < col.width) column.width = col.width;
   });
 
