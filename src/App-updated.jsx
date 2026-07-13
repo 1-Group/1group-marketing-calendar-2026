@@ -2199,9 +2199,9 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
   // Duplicated here (rather than imported) so the heavy ExcelJS-backed module
   // stays lazily loaded and out of the main bundle until the user actually runs it.
   // Inserted right after the Date column:
-  const FRONT_ADDED = ["Demand (Hot/Cold)", "SG Events", "MICE Events", "Visitor Peaks"];
+  const FRONT_ADDED = ["Demand (Hot/Cold)"];
   // Appended at the far right:
-  const TAIL_ADDED = ["1-Group Campaigns", "Venue Activities"];
+  const TAIL_ADDED = ["SG Events", "MICE Events", "Visitor Peaks", "1-Group Campaigns", "Venue Activities"];
 
   const zones = (Array.isArray(venueKeys) && venueKeys.length ? venueKeys : VENUE_KEYS);
 

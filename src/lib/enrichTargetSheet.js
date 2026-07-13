@@ -3,11 +3,13 @@
 // target sheet with a Date column per tab) and folds the 1-Group 2026 marketing
 // calendar into it, matching the agreed layout:
 //
-//   [Date] │ Demand (Hot/Cold) │ SG Events │ MICE Events │ Visitor Peaks │ [Event]…
+//   [Date] │ Demand (Hot/Cold) │ [Event]… │ …financials… │ SG Events │ MICE Events │ Visitor Peaks │ 1-Group Campaigns │ Venue Activities
 //   → Public + School holidays are merged INTO the existing Event column.
-//   → 1-Group Campaigns and Venue Activities are appended at the far right.
+//   → Only the Demand (Hot/Cold) column sits on the LEFT, right after Date.
+//   → SG Events, MICE Events, Visitor Peaks, 1-Group Campaigns and Venue
+//     Activities are all appended at the far right, past the financial blocks.
 //
-// The four calendar columns are INSERTED immediately after the Date column, which
+// The single Demand column is INSERTED immediately after the Date column, which
 // pushes every existing column (and the financial TARGET/ACTUAL/VARIANCE/TO GO
 // blocks) to the right. Excel reflows formulas automatically on a column insert;
 // ExcelJS does not — so we reflow every formula reference ourselves before the
@@ -31,16 +33,17 @@ import {
 
 const CALENDAR_YEAR = 2026;
 
-// Calendar columns inserted immediately after the Date column, in order.
+// Calendar columns inserted immediately after the Date column, in order. Only the
+// Hot/Cold demand rating stays on the left, adjacent to the Date column.
 export const FRONT_COLUMNS = [
   { key: "demand",   label: "Demand (Hot/Cold)", width: 14 },
+];
+
+// Calendar columns appended at the far right (after all existing data), in order.
+export const TAIL_COLUMNS = [
   { key: "sg",       label: "SG Events",         width: 40 },
   { key: "mice",     label: "MICE Events",       width: 34 },
   { key: "visitors", label: "Visitor Peaks",     width: 34 },
-];
-
-// Calendar columns appended at the far right (after all existing data).
-export const TAIL_COLUMNS = [
   { key: "campaign", label: "1-Group Campaigns", width: 34 },
   { key: "venue",    label: "Venue Activities",  width: 40 },
 ];
