@@ -482,6 +482,10 @@ const VENUE_SUBBRANDS = {
   flowerhill: ["Camille", "WAFU by Wildseed (Day)", "WAFU by Wildseed (Night)", "Estate"],
   altitude: ["1-Altitude Coast", "Sol & Ora"],
   atico: ["FIRE", "FLNT", "LOUNGE"],
+  // The Alkaff Mansion's outlets — registered so activities imported from the
+  // venue's marketing-calendar workbook (see src/lib/importVenueCalendar.js) group
+  // and edit correctly. No activities are seeded here; they come from the import.
+  alkaff: ["UNA", "Wildseed Cafe", "1918 Heritage Bar", "The Alkaff Mansion"],
 };
 
 // SEED_VENUE_EVENTS: initial dataset, loaded into user's browser storage on first run.
