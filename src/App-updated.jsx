@@ -139,6 +139,7 @@ export default function MarketingCalendar() {
   const [showVenueCodes, setShowVenueCodes] = useState(false);
   const [showAccessLog, setShowAccessLog] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -484,6 +485,17 @@ export default function MarketingCalendar() {
     setShowAddForm(false);
   };
 
+  // Bulk-load activities parsed from a venue's own marketing-calendar workbook.
+  // Incoming records already carry stable `vn-<venue>-imp-*` ids; re-importing
+  // replaces any previously imported record with the same id (idempotent) and
+  // leaves manually-added and seeded events untouched.
+  const importVenueEvents = (incoming) => {
+    if (!Array.isArray(incoming) || !incoming.length) return;
+    const incomingIds = new Set(incoming.map(e => e.id));
+    saveVenueEvents([...venueEvents.filter(e => !incomingIds.has(e.id)), ...incoming]);
+    setShowImport(false);
+  };
+
   const updateEvent = (rawEvt) => {
     const evt = enforceVenueRole(rawEvt);
     if (evt.layer === "venue") {
@@ -813,6 +825,13 @@ export default function MarketingCalendar() {
                 title="Upload your target sheet — the app adds the 2026 calendar (events, heat map, holidays…) as extra columns"
                 className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-md"
               ><Upload className="w-3.5 h-3.5" /> Enrich Target Sheet</button>
+              {addOK && (
+                <button
+                  onClick={() => setShowImport(true)}
+                  title="Import a venue's own marketing-calendar workbook — the app reads each month's activations into the calendar for review"
+                  className="flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white text-xs px-3 py-1.5 rounded-md"
+                ><FileSpreadsheet className="w-3.5 h-3.5" /> Import Venue Calendar</button>
+              )}
               {selectedZone !== "group" && (
                 <button
                   onClick={() => exportVenueExcel(selectedZone)}
@@ -1143,6 +1162,16 @@ export default function MarketingCalendar() {
           defaultZone={selectedZone}
           venueKeys={visibleVenueKeys}
           onClose={() => setShowUpload(false)}
+        />
+      )}
+
+      {showImport && (
+        <VenueCalendarImport
+          t={t}
+          defaultZone={selectedZone}
+          venueKeys={visibleVenueKeys}
+          onImport={importVenueEvents}
+          onClose={() => setShowImport(false)}
         />
       )}
     </div>
@@ -2366,6 +2395,196 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing…</>
                 : <><Download className="w-3.5 h-3.5" /> Add Calendar &amp; Download</>}
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── VENUE CALENDAR IMPORT ───
+// Upload a venue's own month × sub-brand marketing-calendar workbook; the app
+// parses each activation and shows a review list (confident vs. needs-a-look)
+// BEFORE anything is written. The user picks the target venue, previews, then
+// loads the selected activities into the venue-activity layer. Parsing lives in
+// src/lib/importVenueCalendar.js (lazily imported to keep ExcelJS off the main bundle).
+function VenueCalendarImport({ t, defaultZone, venueKeys, onImport, onClose }) {
+  const initialVenue = defaultZone && defaultZone !== "group" ? defaultZone : null;
+  const zones = (Array.isArray(venueKeys) && venueKeys.length ? venueKeys : VENUE_KEYS).filter(z => z !== "group");
+  const [venue, setVenue] = useState(initialVenue || zones[0] || "");
+  const [file, setFile] = useState(null);
+  const [phase, setPhase] = useState("idle"); // idle | working | preview | error
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState({}); // id -> bool (which records to load)
+
+  const venueName = (z) => (VENUE_HC_RAW[z]?.name || z);
+
+  const pickFile = (f) => {
+    if (!f) return;
+    if (!/\.xlsx$/i.test(f.name)) {
+      setError("Please choose an .xlsx file (Excel workbook)."); setPhase("error"); setFile(null); return;
+    }
+    setError(""); setPhase("idle"); setResult(null); setFile(f);
+  };
+
+  const run = async () => {
+    if (!file || !venue) return;
+    setPhase("working"); setError(""); setResult(null);
+    try {
+      const { importVenueCalendar } = await import("./lib/importVenueCalendar.js");
+      const arrayBuffer = await file.arrayBuffer();
+      const res = await importVenueCalendar(arrayBuffer, { venue, venueName: venueName(venue) });
+      // Pre-select clean events; leave flagged ones unchecked for a deliberate decision.
+      const sel = {};
+      res.events.forEach(e => { sel[e.id] = true; });
+      res.flagged.forEach(e => { sel[e.id] = false; });
+      setSelected(sel);
+      setResult(res);
+      setPhase("preview");
+    } catch (e) {
+      console.error("Venue calendar import failed:", e);
+      setError(e?.message || "Could not read this workbook. Please check it is a valid .xlsx file.");
+      setPhase("error");
+    }
+  };
+
+  const toggle = (id) => setSelected(s => ({ ...s, [id]: !s[id] }));
+  const allRecords = result ? [...result.events, ...result.flagged] : [];
+  const chosenCount = allRecords.filter(r => selected[r.id]).length;
+
+  const loadSelected = async () => {
+    if (!result) return;
+    const { toVenueEvent } = await import("./lib/importVenueCalendar.js");
+    const toLoad = allRecords.filter(r => selected[r.id]).map(toVenueEvent);
+    onImport(toLoad);
+  };
+
+  const whenLabel = (r) => {
+    if (r.start && r.end) return r.start === r.end ? r.start : `${r.start} → ${r.end}`;
+    if (r.undated && r.month != null) return `${MONTH_NAMES?.[r.month] || "Month " + (r.month + 1)} (all month)`;
+    return "—";
+  };
+
+  const Row = ({ r, flaggedRow }) => (
+    <label className={`flex items-start gap-2 px-2 py-1.5 rounded-md cursor-pointer ${t.surfaceHover}`}>
+      <input type="checkbox" checked={!!selected[r.id]} onChange={() => toggle(r.id)} className="mt-0.5" />
+      <div className="min-w-0 flex-1">
+        <div className={`text-xs font-medium ${t.textBody} truncate`}>
+          {r.name} {r.subBrand && <span className={`${t.textDim} font-normal`}>· {r.subBrand}</span>}
+        </div>
+        <div className={`text-[11px] ${t.textDim}`}>{whenLabel(r)}{r.hook ? ` · ${r.hook}` : ""}</div>
+        {flaggedRow && r._flags?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {r._flags.map((f, i) => (
+              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#FEF3C7", color: "#92400E" }}>⚑ {f}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    </label>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`absolute inset-0 ${t.overlayBg}`} />
+      <div className={`relative ${t.panel} border rounded-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto shadow-xl`} onClick={e => e.stopPropagation()}>
+        <div className={`sticky top-0 ${t.panel} border-b p-4 flex items-center justify-between z-10`}>
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4 text-teal-600" />
+            <h3 className={`font-bold text-sm ${t.textHead}`}>Import Venue Marketing Calendar</h3>
+          </div>
+          <button onClick={onClose} className={`p-1 rounded-lg ${t.surfaceHover}`}><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <p className={`text-xs ${t.textMuted}`}>
+            Upload a venue's own marketing-calendar workbook (a month × sub-brand grid). The app reads
+            each month's activations into venue activities for this venue. Nothing is saved until you
+            review the list below and click <strong>Load</strong>. Internal lanes (Memo / Media / Ad-hoc)
+            are skipped; items needing a human decision are flagged.
+          </p>
+
+          {phase !== "preview" && (
+            <>
+              <div>
+                <label className={`block text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1.5`}>Target venue</label>
+                <select value={venue} onChange={e => setVenue(e.target.value)} className={`${t.input} border rounded-md px-2 py-1.5 text-xs w-full focus:outline-none focus:border-teal-500`}>
+                  {zones.map(z => <option key={z} value={z}>{venueName(z)}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className={`block text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1.5`}>Marketing calendar (.xlsx)</label>
+                <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed ${t.borderSoft} ${t.surfaceHover} px-3 py-3 text-xs ${t.textBody}`}>
+                  <Upload className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span className="truncate">{file ? file.name : "Choose an .xlsx file to upload…"}</span>
+                  <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={e => pickFile(e.target.files?.[0])} />
+                </label>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border text-xs" style={{ borderColor: "#FCA5A5", background: "#FEF2F2", color: "#991B1B" }}>
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {phase === "preview" && result && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {[["Ready", result.summary.clean, "#059669"], ["Needs review", result.summary.flagged, "#D97706"], ["Lanes skipped", result.summary.skippedLanes, "#64748B"]].map(([lab, val, col]) => (
+                  <div key={lab} className={`rounded-lg border ${t.border} p-2`}>
+                    <div className="text-lg font-bold" style={{ color: col }}>{val}</div>
+                    <div className={`text-[10px] uppercase tracking-wider ${t.textDim}`}>{lab}</div>
+                  </div>
+                ))}
+              </div>
+              <div className={`text-[11px] ${t.textDim}`}>Importing into <strong>{venueName(result.venue)}</strong> from sheet “{result.sheet}”.</div>
+
+              {result.events.length > 0 && (
+                <div>
+                  <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1`}>Ready to import ({result.events.length})</div>
+                  <div className={`rounded-lg border ${t.border} divide-y ${t.divide} max-h-52 overflow-y-auto`}>
+                    {result.events.map(r => <Row key={r.id} r={r} />)}
+                  </div>
+                </div>
+              )}
+
+              {result.flagged.length > 0 && (
+                <div>
+                  <div className={`text-[11px] font-semibold uppercase tracking-wider ${t.textDim} mb-1`}>Needs review — unchecked by default ({result.flagged.length})</div>
+                  <div className={`rounded-lg border ${t.border} divide-y ${t.divide} max-h-52 overflow-y-auto`}>
+                    {result.flagged.map(r => <Row key={r.id} r={r} flaggedRow />)}
+                  </div>
+                </div>
+              )}
+
+              {result.skipped.length > 0 && (
+                <div className={`text-[11px] ${t.textDim}`}>
+                  Skipped lanes: {result.skipped.map(s => s.lane).join(", ")}.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button onClick={onClose} className={`text-xs px-3 py-1.5 rounded-md ${t.surfaceStrong} ${t.surfaceStrongHover}`}>Cancel</button>
+            {phase === "preview"
+              ? (
+                <button onClick={loadSelected} disabled={!chosenCount}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md text-white ${!chosenCount ? "bg-teal-300 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-500"}`}>
+                  <Check className="w-3.5 h-3.5" /> Load {chosenCount} activit{chosenCount === 1 ? "y" : "ies"}
+                </button>
+              )
+              : (
+                <button onClick={run} disabled={!file || !venue || phase === "working"}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md text-white ${(!file || !venue || phase === "working") ? "bg-teal-300 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-500"}`}>
+                  {phase === "working" ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading…</> : <><Search className="w-3.5 h-3.5" /> Preview activities</>}
+                </button>
+              )}
           </div>
         </div>
       </div>
