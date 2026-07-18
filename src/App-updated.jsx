@@ -288,6 +288,9 @@ export default function MarketingCalendar() {
   const handleSignOut = useCallback(async () => {
     setUser(null);
     try { await storage.delete("calendar-user"); } catch {}
+    // Also drop the signed session token so a stale/expired one never lingers
+    // to confuse the next sign-in (its 12h expiry is independent of the profile).
+    try { localStorage.removeItem("calendar-otp-session"); } catch {}
     setSelectedZone("group");
   }, []);
 
@@ -1155,7 +1158,7 @@ export default function MarketingCalendar() {
 
       {showVenueCodes && codesOK && <VenueCodesPanel t={t} onClose={() => setShowVenueCodes(false)} />}
       {showAccessLog && logOK && <AccessLogPanel t={t} onClose={() => setShowAccessLog(false)} />}
-      {showMembers && logOK && <MemberSettingsPanel t={t} currentUser={user} onClose={() => setShowMembers(false)} />}
+      {showMembers && logOK && <MemberSettingsPanel t={t} currentUser={user} onClose={() => setShowMembers(false)} onSignOut={handleSignOut} />}
       {showUpload && (
         <TargetSheetUpload
           t={t}
@@ -2592,11 +2595,32 @@ function VenueCalendarImport({ t, defaultZone, venueKeys, onImport, onClose }) {
   );
 }
 
+// Decode the (already server-signed) OTP session token client-side, purely to
+// read its expiry. We DON'T trust this for auth — the server re-verifies the
+// HMAC on every privileged call — we only use it to give the user a clear,
+// actionable message when their token has expired, instead of a confusing
+// "Master admin access required." (which really means "your token lapsed").
+function decodeSessionToken(token) {
+  try {
+    if (!token || typeof token !== "string" || !token.includes(".")) return null;
+    let b64 = token.slice(0, token.lastIndexOf(".")).replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const json = decodeURIComponent(
+      atob(b64).split("").map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join("")
+    );
+    const payload = JSON.parse(json);
+    return payload && typeof payload === "object" ? payload : null;
+  } catch { return null; }
+}
+
+// A signed-in master whose secure token is missing/expired needs to re-verify.
+const REAUTH_MSG = "Your secure admin session has expired — these last 12 hours for security. You're still a master admin; just sign in again to refresh it, then reopen this panel.";
+
 // ─── MEMBER SETTINGS PANEL (master admins only) ───
 // Master admins grant / revoke / re-tier access here. Reads and writes the
 // server-side allowlist via /api/admin/members, authenticated by the caller's
 // signed session token. Changes take effect at each member's next sign-in.
-function MemberSettingsPanel({ t, currentUser, onClose }) {
+function MemberSettingsPanel({ t, currentUser, onClose, onSignOut }) {
   const [members, setMembers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -2613,7 +2637,15 @@ function MemberSettingsPanel({ t, currentUser, onClose }) {
   const tierMeta = (k) => TIERS.find(x => x.key === k) || { label: k, color: "#64748b" };
   const venueKeys = VENUE_KEYS.filter(v => v !== "group");
 
+  const [needsReauth, setNeedsReauth] = useState(false);
+
   const token = (() => { try { return localStorage.getItem("calendar-otp-session"); } catch { return null; } })();
+  // Is the secure token missing or already expired? If so, every privileged call
+  // will 401 with "Master admin access required." even though the caller really
+  // is a master — so we surface the real cause (a lapsed session) instead.
+  const tokenPayload = decodeSessionToken(token);
+  const tokenExpired = !token || !tokenPayload ||
+    (typeof tokenPayload.expiresAt === "number" && Date.now() > tokenPayload.expiresAt);
 
   const call = async (action, payload = {}) => {
     const resp = await fetch("/api/admin/members", {
@@ -2622,12 +2654,25 @@ function MemberSettingsPanel({ t, currentUser, onClose }) {
       body: JSON.stringify({ action, token, ...payload }),
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || "Request failed.");
+    if (!resp.ok) {
+      // A 401 for someone whose local profile is master means the token lapsed,
+      // not that they lack permission — give the actionable re-verify message.
+      if (resp.status === 401 && currentUser?.role === "master") {
+        setNeedsReauth(true);
+        const e = new Error(REAUTH_MSG); e.reauth = true; throw e;
+      }
+      throw new Error(data.error || "Request failed.");
+    }
     return data;
   };
 
   const load = async () => {
     setLoading(true); setErr("");
+    // Short-circuit if we already know the token is gone/expired: skip the
+    // doomed request and tell the master to re-verify.
+    if (tokenExpired && currentUser?.role === "master") {
+      setNeedsReauth(true); setErr(REAUTH_MSG); setLoading(false); return;
+    }
     try { const d = await call("list"); setMembers(d.members); }
     catch (e) { setErr(e.message); }
     finally { setLoading(false); }
@@ -2752,7 +2797,20 @@ function MemberSettingsPanel({ t, currentUser, onClose }) {
 
           {err && (
             <div className="flex items-start gap-2 p-3 rounded-lg border text-xs" style={{ borderColor: "#FCA5A5", background: "#FEF2F2", color: "#991B1B" }}>
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /><span>{err}</span>
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <span>{err}</span>
+                {needsReauth && onSignOut && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => { onClose?.(); onSignOut(); }}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-md text-white bg-red-600 hover:bg-red-500"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" /> Sign in again
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
