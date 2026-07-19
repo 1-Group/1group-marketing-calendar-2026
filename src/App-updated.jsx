@@ -1971,11 +1971,12 @@ function DetailPanel({ t, activeHC, hostEventsForZone, item, editOK, canEditEven
                       <div key={i} className={`rounded-md border ${t.border} px-2 py-1.5`}>
                         <div className="flex items-center justify-between gap-2">
                           <span className={`text-xs font-medium ${t.textHead} truncate`}>{ev.client || "Private booking"}</span>
-                          {ev.pax != null && <span className={`text-[11px] ${t.textDim} shrink-0`}>{ev.pax} pax</span>}
+                          {ev.pax != null && ev.pax > 0 && <span className={`text-[11px] ${t.textDim} shrink-0`}>{ev.pax} pax</span>}
                         </div>
-                        {(ev.type || ev.status) && (
+                        {(ev.type || ev.meal || ev.status) && (
                           <div className="flex flex-wrap items-center gap-1 mt-1">
                             {ev.type && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${t.surfaceStrong} ${t.textBody}`}>{ev.type}</span>}
+                            {ev.meal && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: ev.meal === "Lunch" ? "#FEF3C7" : "#E0E7FF", color: ev.meal === "Lunch" ? "#92400E" : "#3730A3" }}>{ev.meal}</span>}
                             {ev.status && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#DCFCE7", color: "#166534" }}>{ev.status}</span>}
                           </div>
                         )}
