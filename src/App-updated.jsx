@@ -164,6 +164,10 @@ export default function MarketingCalendar() {
   // and served from /api/confirmed. Shape: { venueKey: { "YYYY-MM-DD": count } }.
   // null until fetched; stays null (→ static snapshot) if the feed is empty.
   const [liveCounts, setLiveCounts] = useState(null);
+  // Per-event detail (client, pax, type, status) for the day-detail panel. Only
+  // returned to signed-in members (client names are PII). Shape:
+  // { venueKey: { "YYYY-MM-DD": [ { client, pax, type, status }, ... ] } }.
+  const [liveEvents, setLiveEvents] = useState(null);
 
   const t = T;
 
@@ -179,15 +183,23 @@ export default function MarketingCalendar() {
     }
   }, [user, selectedZone]);
 
-  // Pull the live confirmed-event counts once on load. Non-sensitive aggregate
-  // counts; degrades silently to the static snapshot on any error.
+  // Pull the live confirmed-event data once on load. Counts are non-sensitive;
+  // the per-event detail (with client names) only comes back when we send a
+  // valid session token, so members see detail and the endpoint stays private.
+  // Degrades silently to the static snapshot on any error.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/confirmed", { cache: "no-store" })
+    let token = null;
+    try { token = localStorage.getItem("calendar-otp-session"); } catch {}
+    fetch("/api/confirmed", {
+      cache: "no-store",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (cancelled || !d || !d.counts || typeof d.counts !== "object") return;
         if (Object.keys(d.counts).length > 0) setLiveCounts(d.counts);
+        if (d.events && typeof d.events === "object") setLiveEvents(d.events);
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -1187,7 +1199,7 @@ export default function MarketingCalendar() {
         {view === "heatmap" && <HeatmapView t={t} activeHC={activeHC} activeVenue={activeVenue} layers={layers} quarter={quarter} onDetail={setDetailItem} />}
       </div>
 
-      {detailItem && <DetailPanel t={t} activeHC={activeHC} item={detailItem} editOK={addOK} canEditEvent={canEditEvent} onClose={() => setDetailItem(null)} onEdit={(e) => { setDetailItem(null); setEditingEvent(e); }} onDelete={deleteEvent} onAddSimilar={(e) => {
+      {detailItem && <DetailPanel t={t} activeHC={activeHC} hostEventsForZone={liveEvents && liveEvents[selectedZone]} item={detailItem} editOK={addOK} canEditEvent={canEditEvent} onClose={() => setDetailItem(null)} onEdit={(e) => { setDetailItem(null); setEditingEvent(e); }} onDelete={deleteEvent} onAddSimilar={(e) => {
         // Pre-fill Add form with the viewed event's context (venue, sub-brand, layer, dates) but clear Name.
         setDetailItem(null);
         setShowAddForm(true);
@@ -1689,7 +1701,7 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
 
 // ─── DETAIL PANEL ───
 
-function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit, onDelete, onAddSimilar }) {
+function DetailPanel({ t, activeHC, hostEventsForZone, item, editOK, canEditEvent, onClose, onEdit, onDelete, onAddSimilar }) {
   const layer = item.layer || "sg";
   const color = LAYER_COLORS[layer] || LAYER_COLORS.sg;
   const canEdit = canEditEvent ? canEditEvent(item) : item.id?.startsWith("custom-");
@@ -1946,6 +1958,29 @@ function DetailPanel({ t, activeHC, item, editOK, canEditEvent, onClose, onEdit,
                 <span className="text-sm font-medium" style={{ color: LAYER_COLORS[hcInfo.rating].primary }}>{LAYER_COLORS[hcInfo.rating].label}</span>
                 <span className={`text-xs ${t.textDim}`}>({hcInfo.count} 1-Host event{hcInfo.count === 1 ? "" : "s"})</span>
               </div>
+              {/* Per-event detail from Tripleseat (signed-in members only). */}
+              {(() => {
+                const list = (anchorDate && hostEventsForZone && hostEventsForZone[anchorDate]) || [];
+                if (list.length === 0) return null;
+                return (
+                  <div className="mt-2 space-y-1.5">
+                    {list.map((ev, i) => (
+                      <div key={i} className={`rounded-md border ${t.border} px-2 py-1.5`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-xs font-medium ${t.textHead} truncate`}>{ev.client || "Private booking"}</span>
+                          {ev.pax != null && <span className={`text-[11px] ${t.textDim} shrink-0`}>{ev.pax} pax</span>}
+                        </div>
+                        {(ev.type || ev.status) && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {ev.type && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${t.surfaceStrong} ${t.textBody}`}>{ev.type}</span>}
+                            {ev.status && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#DCFCE7", color: "#166534" }}>{ev.status}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

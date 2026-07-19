@@ -15,7 +15,8 @@
 // Env vars: HUB_API_KEY (shared with the hub) + KV_REST_API_URL / _TOKEN.
 
 import crypto from "node:crypto";
-import { getConfirmed, saveConfirmed, sanitiseCounts } from "./_lib/confirmed.js";
+import { getConfirmed, saveConfirmed, sanitiseCounts, sanitiseEvents } from "./_lib/confirmed.js";
+import { verifySessionToken } from "./_lib/members.js";
 
 function constantEquals(a, b) {
   const ab = Buffer.from(String(a));
@@ -32,13 +33,28 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // ─── Read: the calendar UI fetches the live counts to overlay. Never hard-
-  // fail — a read error just degrades to the static snapshot on the client. ──
+  // ─── Read: the calendar UI fetches the live data to overlay. Counts are
+  // non-sensitive and always returned. The per-event DETAIL includes client
+  // names (PII), so it's only included for a caller with a valid session token
+  // (i.e. a signed-in member) — the counts still degrade gracefully otherwise.
+  // Never hard-fail; a read error just falls back to the static snapshot. ──────
   if (req.method === "GET") {
     res.setHeader("Cache-Control", "no-store");
     try {
       const doc = await getConfirmed();
-      return res.status(200).json(doc || { updatedAt: 0, source: null, generatedAt: null, counts: {} });
+      const base = { updatedAt: 0, source: null, generatedAt: null, counts: {} };
+      if (!doc) return res.status(200).json(base);
+      const out = {
+        updatedAt: doc.updatedAt || 0,
+        source: doc.source || null,
+        generatedAt: doc.generatedAt || null,
+        counts: doc.counts || {},
+      };
+      const authz = req.headers.authorization || "";
+      const m = authz.match(/^Bearer\s+(.+)$/i);
+      const session = m ? verifySessionToken(m[1]) : null;
+      if (session) out.events = doc.events || {};
+      return res.status(200).json(out);
     } catch {
       return res.status(200).json({ updatedAt: 0, source: null, generatedAt: null, counts: {} });
     }
@@ -59,12 +75,14 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string" ? safeParse(req.body) : (req.body || {});
     const { counts, venues, days, error } = sanitiseCounts(body.counts);
     if (error) return res.status(400).json({ error });
+    const events = sanitiseEvents(body.events);
 
     const doc = {
       updatedAt: Date.now(),
       source: String(body.source || "1host-hub").slice(0, 40),
       generatedAt: typeof body.generatedAt === "number" ? body.generatedAt : null,
       counts,
+      events,
     };
     try {
       await saveConfirmed(doc);

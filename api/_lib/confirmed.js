@@ -32,6 +32,42 @@ export const VALID_VENUE_KEYS = new Set([
 // Accept any 20xx date so the feed keeps working past 2026 without a code change.
 const DATE_RE = /^20\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
+// Cap the per-day event list so one busy date can't bloat storage/payload.
+const MAX_EVENTS_PER_CELL = 100;
+
+// Validate + normalise the optional per-event detail list the hub sends
+// alongside the counts: { venueKey: { "YYYY-MM-DD": [ { client, pax, type,
+// status }, ... ] } }. Strings are trimmed + length-capped; pax coerced to a
+// non-negative int; unknown venues / bad dates dropped. Client names are PII —
+// the read endpoint only serves this to signed-in members.
+export function sanitiseEvents(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const out = {};
+  for (const [venueRaw, dayMap] of Object.entries(input)) {
+    const venue = String(venueRaw).toLowerCase();
+    if (!VALID_VENUE_KEYS.has(venue)) continue;
+    if (!dayMap || typeof dayMap !== "object" || Array.isArray(dayMap)) continue;
+    const cleanDays = {};
+    for (const [date, list] of Object.entries(dayMap)) {
+      if (!DATE_RE.test(date) || !Array.isArray(list)) continue;
+      const cleanList = [];
+      for (const ev of list.slice(0, MAX_EVENTS_PER_CELL)) {
+        if (!ev || typeof ev !== "object") continue;
+        const client = ev.client != null ? String(ev.client).trim().slice(0, 120) : "";
+        const type = ev.type != null ? String(ev.type).trim().slice(0, 60) : "";
+        const status = ev.status != null ? String(ev.status).trim().slice(0, 40) : "";
+        const paxNum = Number(ev.pax);
+        const pax = Number.isFinite(paxNum) && paxNum >= 0 ? Math.floor(paxNum) : null;
+        if (!client && pax == null && !type && !status) continue; // skip empty rows
+        cleanList.push({ client: client || null, pax, type: type || null, status: status || null });
+      }
+      if (cleanList.length) cleanDays[date] = cleanList;
+    }
+    if (Object.keys(cleanDays).length) out[venue] = cleanDays;
+  }
+  return out;
+}
+
 // Read the stored map. Returns null when unset / Redis unavailable.
 export async function getConfirmed() {
   const creds = redisCreds();
