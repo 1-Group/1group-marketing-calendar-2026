@@ -50,9 +50,21 @@ export default async function handler(req, res) {
         generatedAt: doc.generatedAt || null,
         counts: doc.counts || {},
       };
+      // Non-sensitive diagnostics (no PII): whether/how much event detail is
+      // stored, and whether the caller was recognised as a signed-in member.
+      const evDoc = doc.events || {};
+      let eventVenues = 0, eventCells = 0;
+      for (const [v, days] of Object.entries(evDoc)) {
+        if (v === "group") continue;
+        eventVenues += 1;
+        eventCells += Object.keys(days || {}).length;
+      }
+      out.eventVenues = eventVenues;
+      out.eventCells = eventCells;
       const authz = req.headers.authorization || "";
       const m = authz.match(/^Bearer\s+(.+)$/i);
       const session = m ? verifySessionToken(m[1]) : null;
+      out.authed = Boolean(session);
       if (session) out.events = doc.events || {};
       return res.status(200).json(out);
     } catch {

@@ -203,7 +203,10 @@ export default function MarketingCalendar() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+    // Re-run when the signed-in user changes: the per-event detail needs the
+    // session token, which may only be in localStorage AFTER sign-in — a bare
+    // mount-time fetch would miss it and never show the detail.
+  }, [user]);
 
   // Heatmap data for the selected zone. When the hub has pushed live counts for
   // this venue, they are AUTHORITATIVE for the whole year: each date's count is
