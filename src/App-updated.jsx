@@ -42,6 +42,24 @@ function canSeeAllZones(user) {
 }
 function canSeeVenueCodes(user) { return user && (user.role === "master" || user.role === "admin"); }
 
+// Derive a hot/cold rating from a live confirmed-event count so the heatmap can
+// colour dates fed by the Tripleseat weekly push. Thresholds are zone-aware:
+// the "group" roll-up sums every venue so it runs much higher than a single
+// venue. Heuristic — tune here if the colour bands feel off; it only affects
+// shading, never the count shown.
+function ratingFromCount(count, isGroup) {
+  const n = Number(count) || 0;
+  if (n <= 0) return "cold-cold";
+  if (isGroup) {
+    if (n >= 15) return "hot-hot";
+    if (n >= 5) return "hot";
+    return "cold";
+  }
+  if (n >= 5) return "hot-hot";
+  if (n >= 2) return "hot";
+  return "cold";
+}
+
 // ─── STORAGE WRAPPER (localStorage for Vercel) ───
 const storage = {
   get: async (key) => {
@@ -142,6 +160,10 @@ export default function MarketingCalendar() {
   const [showImport, setShowImport] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // Live "confirmed in Tripleseat" counts, pushed weekly by the 1HostHub app
+  // and served from /api/confirmed. Shape: { venueKey: { "YYYY-MM-DD": count } }.
+  // null until fetched; stays null (→ static snapshot) if the feed is empty.
+  const [liveCounts, setLiveCounts] = useState(null);
 
   const t = T;
 
@@ -157,7 +179,38 @@ export default function MarketingCalendar() {
     }
   }, [user, selectedZone]);
 
-  const activeHC = useMemo(() => parseVenueData(selectedZone), [selectedZone]);
+  // Pull the live confirmed-event counts once on load. Non-sensitive aggregate
+  // counts; degrades silently to the static snapshot on any error.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/confirmed", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancelled || !d || !d.counts || typeof d.counts !== "object") return;
+        if (Object.keys(d.counts).length > 0) setLiveCounts(d.counts);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Heatmap data for the selected zone. When the hub has pushed live counts for
+  // this venue, they are AUTHORITATIVE for the whole year: each date's count is
+  // the Tripleseat confirmed-event number and any date the hub didn't send is
+  // treated as "nothing confirmed" (so cancellations/date-moves self-correct).
+  // Venues the hub hasn't fed yet keep the static 2026 snapshot.
+  const activeHC = useMemo(() => {
+    const staticHC = parseVenueData(selectedZone);
+    const live = liveCounts && liveCounts[selectedZone];
+    if (!live || typeof live !== "object") return staticHC;
+    const isGroup = selectedZone === "group";
+    const merged = {};
+    for (const [date, raw] of Object.entries(live)) {
+      const count = Number(raw) || 0;
+      if (count <= 0) continue;
+      merged[date] = { count, rating: ratingFromCount(count, isGroup), live: true };
+    }
+    return merged;
+  }, [selectedZone, liveCounts]);
   const activeVenue = VENUE_HC_RAW[selectedZone];
 
   useEffect(() => {
@@ -1488,7 +1541,17 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
 
   const legendRatings = ["hot-hot", "hot", "cold", "cold-cold"];
 
-  const summary = venue.summary;
+  // When live Tripleseat counts are overlaid for this venue, recompute the
+  // hot/cold day totals from them so the summary strip matches the grid.
+  // Otherwise keep the venue's authored static summary unchanged.
+  const summary = useMemo(() => {
+    const isLive = Object.values(venueHC).some(d => d && d.live);
+    if (!isLive) return venue.summary;
+    const s = { hh: 0, h: 0, c: 0, cc: 0 };
+    const map = { "hot-hot": "hh", hot: "h", cold: "c", "cold-cold": "cc" };
+    for (const d of Object.values(venueHC)) { const k = map[d?.rating]; if (k) s[k]++; }
+    return s;
+  }, [venueHC, venue.summary]);
 
   return (
     <div>
