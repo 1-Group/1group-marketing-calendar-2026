@@ -53,14 +53,24 @@ export default async function handler(req, res) {
       // Non-sensitive diagnostics (no PII): whether/how much event detail is
       // stored, and whether the caller was recognised as a signed-in member.
       const evDoc = doc.events || {};
-      let eventVenues = 0, eventCells = 0;
+      let eventVenues = 0, eventCells = 0, eventsTotal = 0, withPax = 0, withMeal = 0;
       for (const [v, days] of Object.entries(evDoc)) {
         if (v === "group") continue;
         eventVenues += 1;
-        eventCells += Object.keys(days || {}).length;
+        for (const list of Object.values(days || {})) {
+          eventCells += 1;
+          for (const ev of (Array.isArray(list) ? list : [])) {
+            eventsTotal += 1;
+            if (ev && ev.pax != null) withPax += 1;
+            if (ev && ev.meal) withMeal += 1;
+          }
+        }
       }
       out.eventVenues = eventVenues;
       out.eventCells = eventCells;
+      out.eventsTotal = eventsTotal;
+      out.eventsWithPax = withPax;
+      out.eventsWithMeal = withMeal;
       const authz = req.headers.authorization || "";
       const m = authz.match(/^Bearer\s+(.+)$/i);
       const session = m ? verifySessionToken(m[1]) : null;
