@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText, Download, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 
 // ─── AUTH ───
@@ -196,18 +196,23 @@ export default function MarketingCalendar() {
   // Heatmap data for the selected zone. When the hub has pushed live counts for
   // this venue, they are AUTHORITATIVE for the whole year: each date's count is
   // the Tripleseat confirmed-event number and any date the hub didn't send is
-  // treated as "nothing confirmed" (so cancellations/date-moves self-correct).
-  // Venues the hub hasn't fed yet keep the static 2026 snapshot.
+  // treated as "nothing confirmed" (count 0 → cold) so cancellations/date-moves
+  // self-correct. We seed a cell for EVERY day the static snapshot knew about so
+  // the calendar grid stays fully rendered (0-event days are cold, not blank),
+  // then overlay the live event-days on top. Venues the hub hasn't fed yet keep
+  // the static 2026 snapshot untouched.
   const activeHC = useMemo(() => {
     const staticHC = parseVenueData(selectedZone);
     const live = liveCounts && liveCounts[selectedZone];
     if (!live || typeof live !== "object") return staticHC;
     const isGroup = selectedZone === "group";
     const merged = {};
+    for (const date of Object.keys(staticHC)) {
+      merged[date] = { count: 0, rating: "cold-cold", live: true };
+    }
     for (const [date, raw] of Object.entries(live)) {
       const count = Number(raw) || 0;
-      if (count <= 0) continue;
-      merged[date] = { count, rating: ratingFromCount(count, isGroup), live: true };
+      merged[date] = { count, rating: count > 0 ? ratingFromCount(count, isGroup) : "cold-cold", live: true };
     }
     return merged;
   }, [selectedZone, liveCounts]);
@@ -2701,6 +2706,7 @@ function MemberSettingsPanel({ t, currentUser, onClose, onSignOut }) {
   const venueKeys = VENUE_KEYS.filter(v => v !== "group");
 
   const [needsReauth, setNeedsReauth] = useState(false);
+  const scrollRef = useRef(null);
 
   const token = (() => { try { return localStorage.getItem("calendar-otp-session"); } catch { return null; } })();
   // Is the secure token missing or already expired? If so, every privileged call
@@ -2757,7 +2763,14 @@ function MemberSettingsPanel({ t, currentUser, onClose, onSignOut }) {
   };
 
   const resetForm = () => setForm({ email: "", tier: "viewer", name: "", dept: "", venues: [] });
-  const editRow = (m) => { setForm({ email: m.email, tier: m.tier, name: m.name || "", dept: m.dept || "", venues: [...(m.venues || [])] }); setErr(""); };
+  const editRow = (m) => {
+    setForm({ email: m.email, tier: m.tier, name: m.name || "", dept: m.dept || "", venues: [...(m.venues || [])] });
+    setErr("");
+    // The add/edit form sits at the top of the modal; when a master clicks Edit
+    // from further down the member list, scroll it back into view so the click
+    // has a visible effect (otherwise it looks like nothing happened).
+    try { scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* older browsers */ }
+  };
   const toggleVenue = (v) => setForm(f => ({ ...f, venues: f.venues.includes(v) ? f.venues.filter(x => x !== v) : [...f.venues, v] }));
 
   const save = async () => {
@@ -2776,7 +2789,7 @@ function MemberSettingsPanel({ t, currentUser, onClose, onSignOut }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className={`absolute inset-0 ${t.overlayBg}`} />
-      <div className={`relative ${t.panel} border rounded-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto shadow-xl`} onClick={e => e.stopPropagation()}>
+      <div ref={scrollRef} className={`relative ${t.panel} border rounded-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto shadow-xl`} onClick={e => e.stopPropagation()}>
         <div className={`sticky top-0 ${t.panel} border-b p-4 flex items-center justify-between z-10`}>
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-indigo-600" />
