@@ -56,10 +56,11 @@ export function sanitiseEvents(input) {
         const client = ev.client != null ? String(ev.client).trim().slice(0, 120) : "";
         const type = ev.type != null ? String(ev.type).trim().slice(0, 60) : "";
         const status = ev.status != null ? String(ev.status).trim().slice(0, 40) : "";
+        const meal = ev.meal != null ? String(ev.meal).trim().slice(0, 20) : "";
         const paxNum = Number(ev.pax);
-        const pax = Number.isFinite(paxNum) && paxNum >= 0 ? Math.floor(paxNum) : null;
-        if (!client && pax == null && !type && !status) continue; // skip empty rows
-        cleanList.push({ client: client || null, pax, type: type || null, status: status || null });
+        const pax = Number.isFinite(paxNum) && paxNum > 0 ? Math.floor(paxNum) : null;
+        if (!client && pax == null && !type && !status && !meal) continue; // skip empty rows
+        cleanList.push({ client: client || null, pax, type: type || null, status: status || null, meal: meal || null });
       }
       if (cleanList.length) cleanDays[date] = cleanList;
     }
