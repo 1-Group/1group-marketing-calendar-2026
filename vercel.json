@@ -10,12 +10,5 @@
         }
       ]
     }
-  ],
-  "redirects": [
-    {
-      "source": "/((?!api/|export\\.html).*)",
-      "destination": "https://attribution.1-group.ai/dashboard/calendar",
-      "permanent": false
-    }
   ]
 }
