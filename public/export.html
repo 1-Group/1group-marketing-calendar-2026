@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Export my calendar events</title>
+    <!--
+      The Marketing Calendar has moved to attribution.1-group.ai/dashboard/calendar.
+
+      Events added on this site, and edits to venue activities, were saved in
+      the browser that made them (localStorage), not on a server. This page
+      reads them from THIS browser and downloads them as a file, which the new
+      calendar's "Import from old calendar" button takes.
+
+      It reads only the two event lists. It never reads the sign-in session
+      (calendar-otp-session / calendar-user) and sends nothing anywhere: the
+      file is built in the page and saved by the browser.
+
+      Plain HTML in public/ so it is served as-is at /export.html, with no build
+      step and no dependency on the app — and it is excluded from the redirect in
+      vercel.json, so it keeps working after the site points at the new calendar.
+    -->
+    <style>
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; }
+      main { max-width: 560px; margin: 48px auto; padding: 0 16px; }
+      .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; }
+      h1 { font-size: 20px; margin: 0 0 8px; }
+      p { font-size: 14px; line-height: 1.55; color: #475569; }
+      ol { font-size: 14px; line-height: 1.7; color: #334155; padding-left: 20px; }
+      .counts { font-size: 14px; background: #f1f5f9; border-radius: 8px; padding: 12px 14px; margin: 16px 0; }
+      button { background: #6d28d9; color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+      button:disabled { background: #c4b5fd; cursor: not-allowed; }
+      a { color: #4338ca; }
+      .done { color: #047857; font-size: 14px; margin-top: 12px; }
+      .none { color: #64748b; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>Export my calendar events</h1>
+        <p>
+          The Marketing Calendar has moved to
+          <a href="https://attribution.1-group.ai/dashboard/calendar">attribution.1-group.ai</a>.
+          Events you added here were saved in <strong>this browser only</strong>. Download them,
+          then import them into the new calendar so everyone can see them.
+        </p>
+        <div class="counts" id="counts">Checking this browser…</div>
+        <button id="download" disabled>Download my events</button>
+        <div class="done" id="done" hidden></div>
+        <ol>
+          <li>Open this page in the browser you used for the old calendar.</li>
+          <li>Click <strong>Download my events</strong>.</li>
+          <li>
+            Go to the
+            <a href="https://attribution.1-group.ai/dashboard/calendar">new calendar</a>, click
+            <strong>Import from old calendar</strong> and choose the file.
+          </li>
+        </ol>
+        <p class="none">
+          Importing never overwrites an event that is already in the new calendar, so it is safe
+          for several people to import, or to import twice.
+        </p>
+      </div>
+    </main>
+    <script>
+      (function () {
+        function readList(key) {
+          try {
+            var raw = localStorage.getItem(key);
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+        var customEvents = readList("calendar-events");
+        var venueEvents = readList("calendar-venue-events");
+        // Every browser that opened the old calendar holds a full copy of the
+        // seeded venue activities; the new calendar skips the unchanged ones.
+        // What matters to the person is what they added or edited.
+        var added = venueEvents.filter(function (e) {
+          return e && typeof e.id === "string" && /^vn-user-|-imp-/.test(e.id);
+        }).length;
+        var counts = document.getElementById("counts");
+        var button = document.getElementById("download");
+        if (!customEvents.length && !venueEvents.length) {
+          counts.innerHTML =
+            '<span class="none">No saved calendar events in this browser. If you added events ' +
+            "on another computer or browser, open this page there.</span>";
+          return;
+        }
+        counts.textContent =
+          customEvents.length + " added event" + (customEvents.length === 1 ? "" : "s") +
+          " and " + venueEvents.length + " venue activities (" + added +
+          " that you added or imported; the rest may include your edits) found in this browser.";
+        button.disabled = false;
+        button.addEventListener("click", function () {
+          var doc = {
+            source: "calendar.1-group.ai",
+            exportedAt: new Date().toISOString(),
+            customEvents: customEvents,
+            venueEvents: venueEvents,
+          };
+          var blob = new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url;
+          a.download = "marketing-calendar-events-" + new Date().toISOString().slice(0, 10) + ".json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          var done = document.getElementById("done");
+          done.hidden = false;
+          done.textContent = "Downloaded. Now import it into the new calendar (step 3 below).";
+        });
+      })();
+    </script>
+  </body>
+</html>
