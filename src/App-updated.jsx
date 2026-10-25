@@ -2001,7 +2001,16 @@ function DetailPanel({ t, cal, year, activeHC, hostEventsForZone, item, editOK, 
               {/* Per-event detail from Tripleseat (signed-in members only). */}
               {(() => {
                 const list = (anchorDate && hostEventsForZone && hostEventsForZone[anchorDate]) || [];
-                if (list.length === 0) return null;
+                // A count with no detail list means the Tripleseat push sent the
+                // tally for this date but not the per-event breakdown. Say so plainly
+                // rather than showing a bare count, so it reads as a sync gap not a bug.
+                if (list.length === 0) {
+                  return hcInfo.count > 0 ? (
+                    <div className={`mt-2 text-[11px] italic ${t.textDim}`}>
+                      Booking detail not synced for this date yet — check Tripleseat for specifics.
+                    </div>
+                  ) : null;
+                }
                 return (
                   <div className="mt-2 space-y-1.5">
                     {list.map((ev, i) => (
