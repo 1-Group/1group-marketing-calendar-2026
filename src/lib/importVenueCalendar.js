@@ -23,7 +23,7 @@
 
 import ExcelJS from "exceljs";
 
-const YEAR = 2026;
+let YEAR = 2026; // set per-call from the `year` option in importVenueCalendar()
 
 const MONTHS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
 // month word (full or short) → 0-11
@@ -277,8 +277,9 @@ function detectMatrix(ws) {
 
 // Main entry point. arrayBuffer of a venue marketing-calendar .xlsx → structured
 // import preview. Nothing is written anywhere; the caller decides what to load.
-export async function importVenueCalendar(arrayBuffer, { venue, venueName } = {}) {
+export async function importVenueCalendar(arrayBuffer, { venue, venueName, year = 2026 } = {}) {
   if (!venue) throw new Error("A target venue is required to import activities.");
+  YEAR = year; // drives all parsed dates and the per-record year stamp
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(arrayBuffer);
 
@@ -323,7 +324,7 @@ export async function importVenueCalendar(arrayBuffer, { venue, venueName } = {}
       venue,
       layer: "venue",
       ...(subBrand ? { subBrand } : {}),
-      ...(when.start ? { start: when.start, end: when.end } : { month: when.month, undated: true }),
+      ...(when.start ? { start: when.start, end: when.end } : { month: when.month, undated: true, year: YEAR }),
       ...(activity.hook ? { hook: activity.hook } : {}),
       ...(campaign ? { campaign } : {}),
       _flags: flags,

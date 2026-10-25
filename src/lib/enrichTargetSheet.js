@@ -24,14 +24,9 @@
 // callable from Node or the browser.
 
 import ExcelJS from "exceljs";
-import {
-  MONTH_SHORT,
-  MICE_EVENTS, SG_EVENTS, VISITOR_DATA,
-  SCHOOL_HOLIDAYS, PUBLIC_HOLIDAYS, CAMPAIGNS,
-  SEED_VENUE_EVENTS, parseVenueData, LAYER_COLORS,
-} from "../data/calendar2026.js";
+import { getCalendar, LAYER_COLORS } from "../data/calendar.js";
 
-const CALENDAR_YEAR = 2026;
+const DEFAULT_CALENDAR_YEAR = 2026;
 
 // Calendar columns inserted immediately after the Date column, in order. Only the
 // Hot/Cold demand rating stays on the left, adjacent to the Date column.
@@ -106,7 +101,12 @@ export function cellToISODate(value) {
 
 // Per-date calendar lookup for a zone. Venue activities are scoped to the chosen
 // zone; "group" shows every outlet's.
-export function buildCalendarLookup(zone) {
+export function buildCalendarLookup(zone, year = DEFAULT_CALENDAR_YEAR) {
+  const {
+    MONTH_SHORT, MICE_EVENTS, SG_EVENTS, VISITOR_DATA,
+    SCHOOL_HOLIDAYS, PUBLIC_HOLIDAYS, CAMPAIGNS,
+    SEED_VENUE_EVENTS, parseVenueData,
+  } = getCalendar(year);
   const hcZone = zone && zone !== "group" ? zone : "group";
   const hc = parseVenueData(hcZone);
   const venueEvents = zone && zone !== "group"
@@ -120,7 +120,7 @@ export function buildCalendarLookup(zone) {
       sg: "", mice: "", visitors: "", campaign: "", venue: "",
       ph: "", school: "",
     };
-    if (!iso || parseInt(iso.slice(0, 4), 10) !== CALENDAR_YEAR) return blank;
+    if (!iso || parseInt(iso.slice(0, 4), 10) !== year) return blank;
 
     const mi = parseInt(iso.split("-")[1], 10) - 1;
     const monShort = MONTH_SHORT[mi];
@@ -538,7 +538,7 @@ function enrichSheet(ws, layout, forDate) {
 // Main entry point. Accepts an ArrayBuffer/Buffer of an .xlsx workbook, inserts
 // the calendar columns into every date-based sheet (reflowing all formulas so the
 // financial model stays intact), and returns the new workbook buffer + a summary.
-export async function enrichTargetWorkbook(arrayBuffer, { zone = "group" } = {}) {
+export async function enrichTargetWorkbook(arrayBuffer, { zone = "group", year = DEFAULT_CALENDAR_YEAR } = {}) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(arrayBuffer);
 
@@ -570,7 +570,7 @@ export async function enrichTargetWorkbook(arrayBuffer, { zone = "group" } = {})
   wb.eachSheet((ws) => reflowSheetFormulas(ws, resolve));
 
   // 4. Insert + fill the calendar columns on each date-based sheet.
-  const forDate = buildCalendarLookup(zone);
+  const forDate = buildCalendarLookup(zone, year);
   const sheets = [];
   let totalRows = 0;
   wb.eachSheet((ws) => {
