@@ -119,19 +119,24 @@ const T = {
   chipDimOpacity: "opacity-50",
 };
 
-// ─── 2026 CALENDAR DATASET (shared with /api/events) ───
-// All hot/cold, MICE, SG-event, holiday, campaign and venue-activity data now
-// lives in src/data/calendar2026.js so the UI and the hub API stay in sync.
+// ─── CALENDAR DATASET (shared with /api/events) ───
+// Year-independent constants come straight from the registry; the year-specific
+// data bundle (hot/cold, MICE, SG events, holidays, campaigns, visitor intensity
+// and the year-aware date helpers) is obtained via getCalendar(year) and
+// destructured inside each component so switching the year reflows everything.
 import {
-  VENUE_HC_RAW, VENUE_KEYS, parseVenueData,
-  MICE_EVENTS, SG_EVENTS_RAW, SG_EVENTS, VISITOR_DATA,
-  SCHOOL_HOLIDAYS, PUBLIC_HOLIDAYS, CAMPAIGNS,
-  VENUE_SUBBRANDS, SEED_VENUE_EVENTS,
-  CONFERENCE_DATES, DOUBLE_DIGIT_DATES, DATE_CODE_COLORS,
-  LAYER_COLORS, SALES_SQUARE_COLORS, INTENSITY_COLORS,
-  isInRange, isSchoolHoliday, isPublicHoliday, getMonthIndex,
-  daysInMonth, firstDayOfMonth, dateStr, getVisitorPeaks,
-} from "./data/calendar2026.js";
+  VENUE_KEYS, VENUE_SUBBRANDS, VENUE_META,
+  DATE_CODE_COLORS, LAYER_COLORS, SALES_SQUARE_COLORS, INTENSITY_COLORS,
+  getMonthIndex,
+  getCalendar, YEARS, DEFAULT_YEAR,
+} from "./data/calendar.js";
+
+// Canonical venue-activity seed (2026) — used only for first-run seeding and Reset.
+const BASE_VENUE_SEED = getCalendar(2026).SEED_VENUE_EVENTS;
+
+// The year an event belongs to: from its start date, else an explicit `year`
+// field (stamped on undated events at creation), else 2026 for legacy seeds.
+const eventYear = (e) => (e && e.start ? parseInt(String(e.start).slice(0, 4), 10) : (e?.year || 2026));
 
 // ─── MAIN COMPONENT ───
 
@@ -147,12 +152,13 @@ export default function MarketingCalendar() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [prefillEvent, setPrefillEvent] = useState(null); // pre-fill seed for Add form when opened from a detail panel
   const [customEvents, setCustomEvents] = useState([]);
-  const [venueEvents, setVenueEvents] = useState(SEED_VENUE_EVENTS); // user-editable copy of venue activities
+  const [venueEvents, setVenueEvents] = useState(BASE_VENUE_SEED); // user-editable copy of venue activities
   const [editingEvent, setEditingEvent] = useState(null);
   const [showStats, setShowStats] = useState(false);
   const [showVisitors, setShowVisitors] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
   const [selectedZone, setSelectedZone] = useState("group"); // "group" or a venue key
+  const [year, setYear] = useState(DEFAULT_YEAR); // active calendar year (2026 / 2027)
   const [user, setUser] = useState(null); // { email?, role, name, dept, venue? }
   const [showVenueCodes, setShowVenueCodes] = useState(false);
   const [showAccessLog, setShowAccessLog] = useState(false);
@@ -170,6 +176,16 @@ export default function MarketingCalendar() {
   const [liveEvents, setLiveEvents] = useState(null);
 
   const t = T;
+
+  // Active-year data bundle. Switching `year` swaps the whole dataset (hot/cold,
+  // events, holidays, campaigns, visitor intensity) and the year-aware helpers;
+  // everything downstream reads these destructured names, so the views reflow.
+  const cal = useMemo(() => getCalendar(year), [year]);
+  const {
+    MICE_EVENTS, SG_EVENTS, CAMPAIGNS, PUBLIC_HOLIDAYS, SCHOOL_HOLIDAYS,
+    VISITOR_DATA, CONFERENCE_DATES, DOUBLE_DIGIT_DATES,
+    parseVenueData, VENUE_HC_RAW,
+  } = cal;
 
   // If a venue-only user is signed in, force selectedZone to one of their allowed venues
   useEffect(() => {
@@ -230,7 +246,7 @@ export default function MarketingCalendar() {
       merged[date] = { count, rating: count > 0 ? ratingFromCount(count, isGroup) : "cold-cold", live: true };
     }
     return merged;
-  }, [selectedZone, liveCounts]);
+  }, [selectedZone, liveCounts, cal]);
   const activeVenue = VENUE_HC_RAW[selectedZone];
 
   useEffect(() => {
@@ -293,7 +309,7 @@ export default function MarketingCalendar() {
             if (Array.isArray(parsed)) {
               // Detect missing seed events by ID (only vn-fh-* ids are seed-originated).
               const storedIds = new Set(parsed.map(e => e.id));
-              const missingSeeds = SEED_VENUE_EVENTS.filter(s => !storedIds.has(s.id));
+              const missingSeeds = BASE_VENUE_SEED.filter(s => !storedIds.has(s.id));
               if (missingSeeds.length > 0) {
                 const merged = [...parsed, ...missingSeeds];
                 setVenueEvents(merged);
@@ -304,8 +320,8 @@ export default function MarketingCalendar() {
             }
           } catch {}
         } else {
-          // First-run seed: persist SEED_VENUE_EVENTS as the initial live copy.
-          try { await storage.set("calendar-venue-events", JSON.stringify(SEED_VENUE_EVENTS)); } catch {}
+          // First-run seed: persist the canonical venue seed as the initial live copy.
+          try { await storage.set("calendar-venue-events", JSON.stringify(BASE_VENUE_SEED)); } catch {}
         }
         const prefs = await storage.get("calendar-settings");
         if (prefs?.value) {
@@ -313,8 +329,9 @@ export default function MarketingCalendar() {
           if (p.layers) setLayers(prev => ({ ...prev, ...p.layers }));
           if (p.view) setView(p.view);
           if (p.quarter) setQuarter(p.quarter);
-          if (p.zone && VENUE_HC_RAW[p.zone]) setSelectedZone(p.zone);
-          else if (p.venue && VENUE_HC_RAW[p.venue]) setSelectedZone(p.venue); // legacy
+          if (p.year && YEARS.includes(p.year)) setYear(p.year);
+          if (p.zone && VENUE_META[p.zone]) setSelectedZone(p.zone);
+          else if (p.venue && VENUE_META[p.venue]) setSelectedZone(p.venue); // legacy
         }
       } catch (e) { /* first load */ }
       setLoaded(true);
@@ -377,9 +394,9 @@ export default function MarketingCalendar() {
     try { await storage.set("calendar-venue-events", JSON.stringify(evts)); } catch {}
   }, []);
 
-  const savePrefs = useCallback(async (l, v, q, z) => {
-    try { await storage.set("calendar-settings", JSON.stringify({ layers: l, view: v, quarter: q, zone: z })); } catch {}
-  }, []);
+  const savePrefs = useCallback(async (l, v, q, z, y = year) => {
+    try { await storage.set("calendar-settings", JSON.stringify({ layers: l, view: v, quarter: q, zone: z, year: y })); } catch {}
+  }, [year]);
 
   const toggleLayer = (key) => {
     const next = { ...layers, [key]: !layers[key] };
@@ -393,30 +410,31 @@ export default function MarketingCalendar() {
     if (layers.sg) events.push(...SG_EVENTS);
     if (layers.campaign) events.push(...CAMPAIGNS.map(c => {
       const endM = (c.endMonth != null) ? c.endMonth : c.month;
-      const lastDay = new Date(2026, endM + 1, 0).getDate();
+      const lastDay = new Date(year, endM + 1, 0).getDate();
       return {
         ...c,
-        start: `2026-${String(c.month + 1).padStart(2, "0")}-01`,
-        end: `2026-${String(endM + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+        start: `${year}-${String(c.month + 1).padStart(2, "0")}-01`,
+        end: `${year}-${String(endM + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
       };
     }));
-    // Venue-specific activities (from venueEvents state — user-editable, seeded from SEED_VENUE_EVENTS).
-    // Undated events get synthetic start/end spanning the whole month so views/filters work.
-    if (layers.venue) events.push(...venueEvents.map(e => {
+    // Venue-specific activities (user-editable, seeded from BASE_VENUE_SEED). Only
+    // those belonging to the active year are shown; undated events get synthetic
+    // start/end spanning their month in that year so views/filters work.
+    if (layers.venue) events.push(...venueEvents.filter(e => eventYear(e) === year).map(e => {
       if (e.start && e.end) return e;
       if (e.undated && e.month != null) {
-        const lastDay = new Date(2026, e.month + 1, 0).getDate();
+        const lastDay = new Date(year, e.month + 1, 0).getDate();
         return {
           ...e,
-          start: `2026-${String(e.month + 1).padStart(2, "0")}-01`,
-          end: `2026-${String(e.month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+          start: `${year}-${String(e.month + 1).padStart(2, "0")}-01`,
+          end: `${year}-${String(e.month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
         };
       }
       return e;
     }));
-    events.push(...customEvents);
+    events.push(...customEvents.filter(e => eventYear(e) === year));
     return events;
-  }, [layers, customEvents, venueEvents]);
+  }, [layers, customEvents, venueEvents, cal, year]);
 
   const filteredEvents = useMemo(() => {
     let evts = allEvents;
@@ -497,7 +515,7 @@ export default function MarketingCalendar() {
       if (count < qMin) { qMin = count; quietest = i; }
     }
     return { miceCount, sgCount, campCount, hhDays, ccDays, busiest, quietest, custom: customEvents.length };
-  }, [eventsByMonth, customEvents, activeHC]);
+  }, [eventsByMonth, customEvents, activeHC, cal]);
 
   const handleReset = async () => {
     if (!confirm("Reset will wipe all custom events, venue event edits, and preferences. This restores the default Flowerhill activities and removes any venue events you've added or edited. Continue?")) return;
@@ -506,10 +524,10 @@ export default function MarketingCalendar() {
       await storage.delete("calendar-settings");
       await storage.delete("calendar-venue-events");
       // Re-seed venue events immediately so the next load starts clean.
-      await storage.set("calendar-venue-events", JSON.stringify(SEED_VENUE_EVENTS));
+      await storage.set("calendar-venue-events", JSON.stringify(BASE_VENUE_SEED));
     } catch {}
     setCustomEvents([]);
-    setVenueEvents(SEED_VENUE_EVENTS);
+    setVenueEvents(BASE_VENUE_SEED);
     setLayers({ hotcold: true, mice: true, sg: true, visitor: true, school: true, campaign: true, venue: true });
     setView("board");
     setQuarter("all");
@@ -549,7 +567,9 @@ export default function MarketingCalendar() {
   }, [user]);
 
   const addEvent = (rawEvt) => {
-    const evt = enforceVenueRole(rawEvt);
+    // Stamp the active year so undated events (no date to infer it from) file under
+    // the year they were created in rather than defaulting to 2026.
+    const evt = { ...enforceVenueRole(rawEvt), year };
     // Venue-layer events go to venueEvents storage; everything else goes to customEvents.
     if (evt.layer === "venue") {
       const newEvt = { ...evt, id: `vn-user-${Date.now()}` };
@@ -594,7 +614,7 @@ export default function MarketingCalendar() {
   };
 
   const copySummary = () => {
-    const qLabel = quarter === "all" ? "2026 Full Year" : quarter.toUpperCase();
+    const qLabel = quarter === "all" ? `${year} Full Year` : quarter.toUpperCase();
     let text = `# 1-Group Marketing Calendar — ${qLabel}\n\n`;
     const months = quarter === "all" ? [...Array(12).keys()] : QUARTERS[quarter];
     months.forEach(mi => {
@@ -679,7 +699,7 @@ export default function MarketingCalendar() {
         { width: 12 }, { width: 18 }, { width: 40 }, { width: 18 }, { width: 50 },
       ];
       ws1.mergeCells("A1:E1");
-      ws1.getCell("A1").value = `${venue.name} — Marketing Activities 2026`;
+      ws1.getCell("A1").value = `${venue.name} — Marketing Activities ${year}`;
       ws1.getCell("A1").style = titleStyle;
       ws1.getRow(1).height = 26;
       ws1.mergeCells("A2:E2");
@@ -687,8 +707,8 @@ export default function MarketingCalendar() {
       ws1.getCell("A2").style = subtitleStyle;
 
       // Collect all venue activities for this venue, sorted by month then date
-      const venueActivities = [...SEED_VENUE_EVENTS, ...venueEvents]
-        .filter(e => e.venue === venueKey)
+      const venueActivities = [...BASE_VENUE_SEED, ...venueEvents]
+        .filter(e => e.venue === venueKey && eventYear(e) === year)
         .sort((a, b) => {
           const aMonth = a.start ? parseInt(a.start.split("-")[1]) - 1 : (a.month ?? 12);
           const bMonth = b.start ? parseInt(b.start.split("-")[1]) - 1 : (b.month ?? 12);
@@ -715,7 +735,7 @@ export default function MarketingCalendar() {
       });
       if (venueActivities.length === 0) {
         ws1.mergeCells(`A5:E5`);
-        ws1.getCell("A5").value = `No activities scheduled for ${venue.name} in 2026 yet.`;
+        ws1.getCell("A5").value = `No activities scheduled for ${venue.name} in ${year} yet.`;
         ws1.getCell("A5").style = subtitleStyle;
         row1 = 6;
       } else {
@@ -729,7 +749,7 @@ export default function MarketingCalendar() {
       });
       ws2.columns = [{ width: 12 }, { width: 36 }, { width: 50 }];
       ws2.mergeCells("A1:C1");
-      ws2.getCell("A1").value = "1-Group Marketing Campaigns 2026";
+      ws2.getCell("A1").value = `1-Group Marketing Campaigns ${year}`;
       ws2.getCell("A1").style = titleStyle;
       ws2.getRow(1).height = 26;
       ws2.mergeCells("A2:C2");
@@ -751,7 +771,7 @@ export default function MarketingCalendar() {
       });
       ws3.columns = [{ width: 32 }, { width: 22 }, { width: 18 }];
       ws3.mergeCells("A1:C1");
-      ws3.getCell("A1").value = "Singapore Public & School Holidays 2026";
+      ws3.getCell("A1").value = `Singapore Public & School Holidays ${year}`;
       ws3.getCell("A1").style = titleStyle;
       ws3.getRow(1).height = 26;
       ws3.mergeCells("A2:C2");
@@ -782,7 +802,7 @@ export default function MarketingCalendar() {
         { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 },
       ];
       ws4.mergeCells("A1:N1");
-      ws4.getCell("A1").value = "International Visitor Markets — 2026 Monthly Intensity";
+      ws4.getCell("A1").value = `International Visitor Markets — ${year} Monthly Intensity`;
       ws4.getCell("A1").style = titleStyle;
       ws4.getRow(1).height = 26;
       ws4.mergeCells("A2:N2");
@@ -828,7 +848,7 @@ export default function MarketingCalendar() {
       // ── Save ─────────────────────────────────────────────────────────
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const filename = `1-Group_${venue.shortName.replace(/\s+/g, "_")}_Calendar_2026.xlsx`;
+      const filename = `1-Group_${venue.shortName.replace(/\s+/g, "_")}_Calendar_${year}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -870,7 +890,7 @@ export default function MarketingCalendar() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <h1 className="text-xl font-bold tracking-tight" style={{ background: t.gradient, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                {selectedZone === "group" ? "1-Group Marketing Calendar 2026" : `${activeVenue.name} · Marketing Calendar 2026`}
+                {selectedZone === "group" ? `1-Group Marketing Calendar ${year}` : `${activeVenue.name} · Marketing Calendar ${year}`}
               </h1>
               <p className={`text-xs ${t.tagline} mt-0.5`}>
                 {selectedZone === "group"
@@ -898,7 +918,7 @@ export default function MarketingCalendar() {
               <button onClick={copySummary} className={`flex items-center gap-1 ${t.surfaceStrong} ${t.surfaceStrongHover} text-xs px-3 py-1.5 rounded-md`}><Copy className="w-3.5 h-3.5" /> Copy</button>
               <button
                 onClick={() => setShowUpload(true)}
-                title="Upload your target sheet — the app adds the 2026 calendar (events, heat map, holidays…) as extra columns"
+                title={`Upload your target sheet — the app adds the ${year} calendar (events, heat map, holidays…) as extra columns`}
                 className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-md"
               ><Upload className="w-3.5 h-3.5" /> Enrich Target Sheet</button>
               {addOK && (
@@ -911,7 +931,7 @@ export default function MarketingCalendar() {
               {selectedZone !== "group" && (
                 <button
                   onClick={() => exportVenueExcel(selectedZone)}
-                  title={`Download ${activeVenue.shortName} 2026 calendar (events, campaigns, holidays, visitors)`}
+                  title={`Download ${activeVenue.shortName} ${year} calendar (events, campaigns, holidays, visitors)`}
                   className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-md"
                 ><Download className="w-3.5 h-3.5" /> {activeVenue.shortName} .xlsx</button>
               )}
@@ -950,12 +970,22 @@ export default function MarketingCalendar() {
           )}
 
           <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
-            <div className="flex gap-1">
-              {[["board", "Board", Grid3X3], ["month", "Month", Calendar], ["heatmap", "Heatmap", BarChart3]].map(([v, label, Icon]) => (
-                <button key={v} onClick={() => { setView(v); savePrefs(layers, v, quarter, selectedZone); }} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-md ${view === v ? "bg-purple-600 text-white" : t.inactive}`}>
-                  <Icon className="w-3.5 h-3.5" />{label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 mr-1">
+                {YEARS.map(y => (
+                  <button key={y} onClick={() => { setYear(y); savePrefs(layers, view, quarter, selectedZone, y); }}
+                    className={`text-xs px-3 py-1.5 rounded-md font-semibold ${year === y ? "bg-slate-800 text-white" : t.inactive}`}>
+                    {y}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {[["board", "Board", Grid3X3], ["month", "Month", Calendar], ["heatmap", "Heatmap", BarChart3]].map(([v, label, Icon]) => (
+                  <button key={v} onClick={() => { setView(v); savePrefs(layers, v, quarter, selectedZone); }} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-md ${view === v ? "bg-purple-600 text-white" : t.inactive}`}>
+                    <Icon className="w-3.5 h-3.5" />{label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex gap-1">
               {["all", "q1", "q2", "q3", "q4"].map(q => (
@@ -1197,12 +1227,12 @@ export default function MarketingCalendar() {
       )}
 
       <div className="p-4">
-        {view === "board" && <BoardView t={t} activeHC={activeHC} activeVenue={activeVenue} eventsByMonth={eventsByMonth} layers={layers} quarter={quarter} onDetail={setDetailItem} onMonthClick={(mi) => { setSelectedMonth(mi); setView("month"); }} />}
-        {view === "month" && <MonthView t={t} activeHC={activeHC} month={selectedMonth} setMonth={setSelectedMonth} events={eventsByMonth[selectedMonth] || []} layers={layers} onDetail={setDetailItem} />}
-        {view === "heatmap" && <HeatmapView t={t} activeHC={activeHC} activeVenue={activeVenue} layers={layers} quarter={quarter} onDetail={setDetailItem} />}
+        {view === "board" && <BoardView t={t} cal={cal} year={year} activeHC={activeHC} activeVenue={activeVenue} eventsByMonth={eventsByMonth} layers={layers} quarter={quarter} onDetail={setDetailItem} onMonthClick={(mi) => { setSelectedMonth(mi); setView("month"); }} />}
+        {view === "month" && <MonthView t={t} cal={cal} year={year} activeHC={activeHC} month={selectedMonth} setMonth={setSelectedMonth} events={eventsByMonth[selectedMonth] || []} layers={layers} onDetail={setDetailItem} />}
+        {view === "heatmap" && <HeatmapView t={t} cal={cal} year={year} activeHC={activeHC} activeVenue={activeVenue} layers={layers} quarter={quarter} onDetail={setDetailItem} />}
       </div>
 
-      {detailItem && <DetailPanel t={t} activeHC={activeHC} hostEventsForZone={liveEvents && liveEvents[selectedZone]} item={detailItem} editOK={addOK} canEditEvent={canEditEvent} onClose={() => setDetailItem(null)} onEdit={(e) => { setDetailItem(null); setEditingEvent(e); }} onDelete={deleteEvent} onAddSimilar={(e) => {
+      {detailItem && <DetailPanel t={t} cal={cal} year={year} activeHC={activeHC} hostEventsForZone={liveEvents && liveEvents[selectedZone]} item={detailItem} editOK={addOK} canEditEvent={canEditEvent} onClose={() => setDetailItem(null)} onEdit={(e) => { setDetailItem(null); setEditingEvent(e); }} onDelete={deleteEvent} onAddSimilar={(e) => {
         // Pre-fill Add form with the viewed event's context (venue, sub-brand, layer, dates) but clear Name.
         setDetailItem(null);
         setShowAddForm(true);
@@ -1211,8 +1241,8 @@ export default function MarketingCalendar() {
           layer: e.layer || "venue",
           venue: e.venue || "",
           subBrand: e.subBrand || "",
-          start: e.start || "2026-01-01",
-          end: e.end || "2026-01-01",
+          start: e.start || `${year}-01-01`,
+          end: e.end || `${year}-01-01`,
           hook: "",
           type: e.type || "",
         });
@@ -1222,6 +1252,7 @@ export default function MarketingCalendar() {
         <EventFormModal
           t={t}
           user={user}
+          year={year}
           event={editingEvent || prefillEvent}
           isPrefill={!editingEvent && !!prefillEvent}
           onSave={editingEvent ? updateEvent : addEvent}
@@ -1235,6 +1266,7 @@ export default function MarketingCalendar() {
       {showUpload && (
         <TargetSheetUpload
           t={t}
+          year={year}
           defaultZone={selectedZone}
           venueKeys={visibleVenueKeys}
           onClose={() => setShowUpload(false)}
@@ -1244,6 +1276,7 @@ export default function MarketingCalendar() {
       {showImport && (
         <VenueCalendarImport
           t={t}
+          year={year}
           defaultZone={selectedZone}
           venueKeys={visibleVenueKeys}
           onImport={importVenueEvents}
@@ -1256,7 +1289,8 @@ export default function MarketingCalendar() {
 
 // ─── BOARD VIEW ───
 
-function BoardView({ t, activeHC, activeVenue, eventsByMonth, layers, quarter, onDetail, onMonthClick }) {
+function BoardView({ t, cal, year, activeHC, activeVenue, eventsByMonth, layers, quarter, onDetail, onMonthClick }) {
+  const { daysInMonth, dateStr, getVisitorPeaks, PUBLIC_HOLIDAYS, SCHOOL_HOLIDAYS, CONFERENCE_DATES, DOUBLE_DIGIT_DATES } = cal;
   const quarters = quarter === "all" ? ["q1", "q2", "q3", "q4"] : [quarter];
   const isDay = t.name === "day";
   return (
@@ -1368,7 +1402,8 @@ function EventChip({ t, event, onClick }) {
 
 // ─── MONTH VIEW ───
 
-function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
+function MonthView({ t, cal, year, activeHC, month, setMonth, events, layers, onDetail }) {
+  const { daysInMonth, firstDayOfMonth, getVisitorPeaks, VISITOR_DATA, dateStr, isPublicHoliday, isSchoolHoliday, CONFERENCE_DATES, DOUBLE_DIGIT_DATES } = cal;
   const days = daysInMonth(month);
   const startDay = firstDayOfMonth(month);
   const offset = startDay === 0 ? 6 : startDay - 1;
@@ -1380,8 +1415,8 @@ function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
   // that's the synthetic range allEvents creates from undated source events.
   const undatedEvents = useMemo(() => {
     const lastDay = days;
-    const monthStart = `2026-${String(month + 1).padStart(2, "0")}-01`;
-    const monthEnd = `2026-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const monthEnd = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     return events.filter(e => {
       if (e.undated) return true;
       if (e.start === monthStart && e.end === monthEnd) return true; // synthetic whole-month range
@@ -1420,7 +1455,7 @@ function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => setMonth(Math.max(0, month - 1))} className={`p-2 ${t.surface} rounded-lg ${t.surfaceHover}`}><ChevronLeft className="w-4 h-4" /></button>
-        <h2 className={`text-lg font-bold ${t.textHead}`}>{MONTH_NAMES[month]} 2026</h2>
+        <h2 className={`text-lg font-bold ${t.textHead}`}>{MONTH_NAMES[month]} {year}</h2>
         <button onClick={() => setMonth(Math.min(11, month + 1))} className={`p-2 ${t.surface} rounded-lg ${t.surfaceHover}`}><ChevronRight className="w-4 h-4" /></button>
       </div>
       {undatedEvents.length > 0 && (
@@ -1500,7 +1535,7 @@ function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
                   onDetail({
                     id: `date-${key}`,
                     isDateAnchor: true,
-                    name: ph ? ph.name : sh ? `School Holiday — ${MONTH_NAMES[month]} ${d}` : `${MONTH_NAMES[month]} ${d}, 2026`,
+                    name: ph ? ph.name : sh ? `School Holiday — ${MONTH_NAMES[month]} ${d}` : `${MONTH_NAMES[month]} ${d}, ${year}`,
                     start: key,
                     end: key,
                     _clickDate: key,
@@ -1555,7 +1590,8 @@ function MonthView({ t, activeHC, month, setMonth, events, layers, onDetail }) {
 
 // ─── HEATMAP VIEW ───
 
-function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
+function HeatmapView({ t, cal, year, activeHC, activeVenue, layers, quarter, onDetail }) {
+  const { daysInMonth, dateStr, isPublicHoliday, isSchoolHoliday, CONFERENCE_DATES, DOUBLE_DIGIT_DATES } = cal;
   const months = quarter === "all" ? [...Array(12).keys()] : QUARTERS[quarter];
   const isDay = t.name === "day";
 
@@ -1625,7 +1661,7 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
                             onDetail({
                               id: `date-${key}`,
                               isDateAnchor: true,
-                              name: ph ? ph.name : sh ? `School Holiday — ${MONTH_SHORT[mi]} ${d}` : `${MONTH_SHORT[mi]} ${d}, 2026`,
+                              name: ph ? ph.name : sh ? `School Holiday — ${MONTH_SHORT[mi]} ${d}` : `${MONTH_SHORT[mi]} ${d}, ${year}`,
                               start: key,
                               end: key,
                               _clickDate: key,
@@ -1644,7 +1680,7 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
                           </span>
                         )}
                         <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-1 ${t.tooltipBg} border rounded px-2 py-1 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity shadow-xl`}>
-                          <div className="font-bold">{MONTH_SHORT[mi]} {d}, 2026</div>
+                          <div className="font-bold">{MONTH_SHORT[mi]} {d}, {year}</div>
                           <div className={t.textMuted}>{venue.shortName}</div>
                           <div style={{ color: LAYER_COLORS[hc?.rating]?.primary || (isDay ? "#64748b" : "#888") }}>{ratingLabel} · {hc?.count || 0} 1-Host event{hc?.count === 1 ? "" : "s"}</div>
                           {isDD && <div style={{ color: DATE_CODE_COLORS.doubledigit }}>● Double-digit date</div>}
@@ -1704,7 +1740,8 @@ function HeatmapView({ t, activeHC, activeVenue, layers, quarter, onDetail }) {
 
 // ─── DETAIL PANEL ───
 
-function DetailPanel({ t, activeHC, hostEventsForZone, item, editOK, canEditEvent, onClose, onEdit, onDelete, onAddSimilar }) {
+function DetailPanel({ t, cal, year, activeHC, hostEventsForZone, item, editOK, canEditEvent, onClose, onEdit, onDelete, onAddSimilar }) {
+  const { getVisitorPeaks, isPublicHoliday, isSchoolHoliday, CONFERENCE_DATES, DOUBLE_DIGIT_DATES } = cal;
   const layer = item.layer || "sg";
   const color = LAYER_COLORS[layer] || LAYER_COLORS.sg;
   const canEdit = canEditEvent ? canEditEvent(item) : item.id?.startsWith("custom-");
@@ -2017,7 +2054,7 @@ function DetailPanel({ t, activeHC, hostEventsForZone, item, editOK, canEditEven
 
 // ─── EVENT FORM MODAL ───
 
-function EventFormModal({ t, user, event, isPrefill, onSave, onClose }) {
+function EventFormModal({ t, user, year = 2026, event, isPrefill, onSave, onClose }) {
   // Backward compat: if editing a legacy custom event with a display-name venue
   // (e.g. "1-Flowerhill"), map it back to its slug ("flowerhill") on load.
   const DISPLAY_TO_SLUG = {
@@ -2058,8 +2095,8 @@ function EventFormModal({ t, user, event, isPrefill, onSave, onClose }) {
   const [form, setForm] = useState(event ? { ...event, venue: normaliseVenue(event.venue) } : {
     name: "",
     layer: isVenueUser ? "venue" : "sg",
-    start: "2026-01-01",
-    end: "2026-01-01",
+    start: `${year}-01-01`,
+    end: `${year}-01-01`,
     type: "",
     venue: isVenueUser && venueUserVenues[0] ? venueUserVenues[0] : "",
     cat: "", dateStr: "",
@@ -2327,7 +2364,7 @@ function SignIn({ t, onSignIn }) {
 // holidays, SG/MICE events, campaigns, venue activities, visitor peaks — as extra
 // columns to the right of each date-based tab, then hand back the enriched file.
 // The transform is non-destructive: existing values/formulas/formatting are kept.
-function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
+function TargetSheetUpload({ t, year = 2026, defaultZone, venueKeys, onClose }) {
   const [zone, setZone] = useState(defaultZone || "group");
   const [file, setFile] = useState(null);
   const [phase, setPhase] = useState("idle"); // idle | working | done | error
@@ -2367,13 +2404,13 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
       // Lazy import keeps ExcelJS + calendar data out of the initial page load.
       const { enrichTargetWorkbook } = await import("./lib/enrichTargetSheet.js");
       const arrayBuffer = await file.arrayBuffer();
-      const { buffer, sheets, totalRows } = await enrichTargetWorkbook(arrayBuffer, { zone });
+      const { buffer, sheets, totalRows } = await enrichTargetWorkbook(arrayBuffer, { zone, year });
 
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
       const base = file.name.replace(/\.xlsx$/i, "");
-      const filename = `${base}__1Group_Calendar_2026.xlsx`;
+      const filename = `${base}__1Group_Calendar_${year}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -2392,7 +2429,7 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
     }
   };
 
-  const zoneLabel = (z) => (z === "group" ? "1-Group (all venues)" : (VENUE_HC_RAW[z]?.name || z));
+  const zoneLabel = (z) => (z === "group" ? "1-Group (all venues)" : (VENUE_META[z]?.name || z));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -2408,7 +2445,7 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
 
         <div className="p-4 space-y-4">
           <p className={`text-xs ${t.textMuted}`}>
-            Upload your Excel target sheet and the app folds the 2026 marketing calendar into every
+            Upload your Excel target sheet and the app folds the {year} marketing calendar into every
             date-based tab, keyed off each daily date. Your existing numbers and formulas are
             preserved — the financial formulas are automatically re-pointed for the new columns, so
             every sum and total still works.
@@ -2488,7 +2525,7 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
                 Enriched {result.sheets.length} tab{result.sheets.length === 1 ? "" : "s"} ({result.totalRows} day rows):{" "}
                 {result.sheets.map(s => `${s.name} (${s.rows})`).join(", ")}.
               </div>
-              <div className="mt-1 opacity-80">Only 2026 dates carry calendar data; any 2027 rows are left blank.</div>
+              <div className="mt-1 opacity-80">Only {year} dates carry calendar data; rows in other years are left blank.</div>
             </div>
           )}
 
@@ -2518,7 +2555,7 @@ function TargetSheetUpload({ t, defaultZone, venueKeys, onClose }) {
 // BEFORE anything is written. The user picks the target venue, previews, then
 // loads the selected activities into the venue-activity layer. Parsing lives in
 // src/lib/importVenueCalendar.js (lazily imported to keep ExcelJS off the main bundle).
-function VenueCalendarImport({ t, defaultZone, venueKeys, onImport, onClose }) {
+function VenueCalendarImport({ t, year = 2026, defaultZone, venueKeys, onImport, onClose }) {
   const initialVenue = defaultZone && defaultZone !== "group" ? defaultZone : null;
   const zones = (Array.isArray(venueKeys) && venueKeys.length ? venueKeys : VENUE_KEYS).filter(z => z !== "group");
   const [venue, setVenue] = useState(initialVenue || zones[0] || "");
@@ -2528,7 +2565,7 @@ function VenueCalendarImport({ t, defaultZone, venueKeys, onImport, onClose }) {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState({}); // id -> bool (which records to load)
 
-  const venueName = (z) => (VENUE_HC_RAW[z]?.name || z);
+  const venueName = (z) => (VENUE_META[z]?.name || z);
 
   const pickFile = (f) => {
     if (!f) return;
@@ -2544,7 +2581,7 @@ function VenueCalendarImport({ t, defaultZone, venueKeys, onImport, onClose }) {
     try {
       const { importVenueCalendar } = await import("./lib/importVenueCalendar.js");
       const arrayBuffer = await file.arrayBuffer();
-      const res = await importVenueCalendar(arrayBuffer, { venue, venueName: venueName(venue) });
+      const res = await importVenueCalendar(arrayBuffer, { venue, venueName: venueName(venue), year });
       // Pre-select clean events; leave flagged ones unchecked for a deliberate decision.
       const sel = {};
       res.events.forEach(e => { sel[e.id] = true; });
@@ -2890,7 +2927,7 @@ function MemberSettingsPanel({ t, currentUser, onClose, onSignOut }) {
                       onClick={() => toggleVenue(v)}
                       className={`text-[11px] px-2 py-0.5 rounded-full border ${form.venues.includes(v) ? "bg-amber-100 border-amber-400 text-amber-800" : `${t.chipInactiveBorder} ${t.textDim}`}`}
                     >
-                      {VENUE_HC_RAW[v]?.shortName || v}
+                      {VENUE_META[v]?.shortName || v}
                     </button>
                   ))}
                 </div>
@@ -2958,7 +2995,7 @@ function MemberSettingsPanel({ t, currentUser, onClose, onSignOut }) {
                           </div>
                           <div className={`text-[11px] ${t.textDim} truncate`}>
                             {m.email}{m.dept ? ` · ${m.dept}` : ""}
-                            {m.tier === "outlet" && m.venues?.length ? ` · ${m.venues.map(v => VENUE_HC_RAW[v]?.shortName || v).join(", ")}` : ""}
+                            {m.tier === "outlet" && m.venues?.length ? ` · ${m.venues.map(v => VENUE_META[v]?.shortName || v).join(", ")}` : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -3012,7 +3049,7 @@ function VenueCodesPanel({ t, onClose }) {
             Historical outlet access codes (deprecated, kept for reference only):
           </p>
           {Object.entries(VENUE_ACCESS_CODES).map(([vkey, code]) => {
-            const v = VENUE_HC_RAW[vkey];
+            const v = VENUE_META[vkey];
             return (
               <div key={vkey} className={`flex items-center justify-between p-3 rounded-lg border ${t.border}`}>
                 <div className="flex items-center gap-2">
@@ -3194,7 +3231,7 @@ function AccessLogPanel({ t, onClose }) {
                           <td className={`py-1.5 pr-3 whitespace-nowrap ${t.textBody}`}>{fmt(e.ts)}</td>
                           <td className={`py-1.5 pr-3 ${t.textBody} font-medium`}>{e.name || "—"}</td>
                           <td className={`py-1.5 pr-3 ${t.textMuted}`}>{roleLabel(e.role)}</td>
-                          <td className={`py-1.5 pr-3 ${t.textMuted}`}>{e.venue ? (VENUE_HC_RAW[e.venue]?.name || e.venue) : (e.dept || "—")}</td>
+                          <td className={`py-1.5 pr-3 ${t.textMuted}`}>{e.venue ? (VENUE_META[e.venue]?.name || e.venue) : (e.dept || "—")}</td>
                           <td className="py-1.5 pr-3 whitespace-nowrap">
                             {e.verified
                               ? <span className="text-emerald-600 inline-flex items-center gap-0.5"><Check className="w-3 h-3" /> OTP verified</span>
