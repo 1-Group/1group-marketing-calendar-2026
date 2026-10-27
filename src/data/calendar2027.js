@@ -5,7 +5,8 @@
 // school holidays, SG & MICE events, visitor intensity, campaigns, and each
 // venue's hot/cold demand). Year-independent constants (month names, colours,
 // venue keys & sub-brands) are re-exported from calendar2026.js so the two years
-// never drift apart. Everything year-specific starts empty here.
+// never drift apart. Public and school holidays are filled in; the rest of the
+// year-specific data starts empty here.
 //
 // To populate: fill the arrays/Sets/VENUE_HC_RAW[venue].data below (or import via
 // the app's "Import Venue Calendar" tool once the template comes back).
@@ -46,13 +47,36 @@ function parseVenueData(venueKey) {
   return result;
 }
 
-// ─── YEAR-SPECIFIC DATA (blank for 2027) ───
+// ─── YEAR-SPECIFIC DATA (2027: holidays filled; events, visitors, campaigns blank) ───
 const MICE_EVENTS = [];
 const SG_EVENTS_RAW = [];
 const SG_EVENTS = [];
 const VISITOR_DATA = [];          // [{market, arrivals, data:{Jan:"Peak",...}}]
-const SCHOOL_HOLIDAYS = [];       // [{name, start, end}]
-const PUBLIC_HOLIDAYS = [];       // [{name, date}]
+// MOE school terms and holidays for 2027 (MOE, 14 July 2026).
+const SCHOOL_HOLIDAYS = [
+  {name:"Term 1 Break",start:"2027-03-13",end:"2027-03-21"},
+  {name:"Mid-Year Holidays",start:"2027-05-29",end:"2027-06-27"},
+  {name:"Term 3 Break",start:"2027-09-04",end:"2027-09-12"},
+  {name:"Year-End Holidays",start:"2027-11-20",end:"2027-12-31"},
+];
+// Gazetted by MOM ("Public Holidays for 2027", press release of 18 June
+// 2026). Chinese New Year's second day is a Sunday, so the Monday after is a
+// holiday. Labour Day and Christmas fall on Saturdays: no Monday holiday
+// follows those (employees get a day off or pay in lieu instead).
+const PUBLIC_HOLIDAYS = [
+  {name:"New Year's Day",date:"2027-01-01"},
+  {name:"Chinese New Year",date:"2027-02-06"},
+  {name:"Chinese New Year (Day 2)",date:"2027-02-07"},
+  {name:"Chinese New Year (observed)",date:"2027-02-08"},
+  {name:"Hari Raya Puasa",date:"2027-03-10"},
+  {name:"Good Friday",date:"2027-03-26"},
+  {name:"Labour Day",date:"2027-05-01"},
+  {name:"Hari Raya Haji",date:"2027-05-17"},
+  {name:"Vesak Day",date:"2027-05-20"},
+  {name:"National Day",date:"2027-08-09"},
+  {name:"Deepavali",date:"2027-10-28"},
+  {name:"Christmas Day",date:"2027-12-25"},
+];
 const CAMPAIGNS = [];             // [{id, name, month, endMonth?, tagline, layer:"campaign"}]
 const SEED_VENUE_EVENTS = [];     // venue activities arrive via the import tool
 
