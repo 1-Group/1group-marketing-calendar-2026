@@ -5,8 +5,8 @@
 // school holidays, SG & MICE events, visitor intensity, campaigns, and each
 // venue's hot/cold demand). Year-independent constants (month names, colours,
 // venue keys & sub-brands) are re-exported from calendar2026.js so the two years
-// never drift apart. Public and school holidays and visitor intensity are filled
-// in; the rest of the year-specific data starts empty here.
+// never drift apart. Public and school holidays, visitor intensity and MICE
+// events are filled in; the rest of the year-specific data starts empty here.
 //
 // To populate: fill the arrays/Sets/VENUE_HC_RAW[venue].data below (or import via
 // the app's "Import Venue Calendar" tool once the template comes back).
@@ -47,8 +47,61 @@ function parseVenueData(venueKey) {
   return result;
 }
 
-// ─── YEAR-SPECIFIC DATA (2027: holidays and visitor intensity filled; events and campaigns blank) ───
-const MICE_EVENTS = [];
+// ─── YEAR-SPECIFIC DATA (2027: holidays, visitor intensity and MICE filled; SG events and campaigns blank) ───
+// MICE events in Singapore, 2027 (researched 27 Oct 2026 from STB/SECB, the
+// venues' calendars and the organisers' own pages). Dates are the organiser's
+// published 2027 dates. "(dates TBC)" marks a big annual event whose 2027
+// dates are not out yet: it is placed on the same weekdays as its 2026
+// edition and should be corrected once the organiser publishes.
+// Not in Singapore in 2027: Singapore Airshow, IDEM, Asia Pacific Maritime,
+// SIWW and World Cities Summit (all next in 2028); Money20/20 Asia (Bangkok).
+// Announced with no dates yet: the ASEAN Summits (Singapore chairs ASEAN in
+// 2027) and WindEnergy Asia-Pacific.
+const MICE_EVENTS = [
+  {id:"mice-1",name:"SIOHEC 2027 (Oral Health Congress)",start:"2027-01-14",end:"2027-01-17",cat:"Dental/Medical",layer:"mice"},
+  {id:"mice-2",name:"ASEAN Tourism Forum 2027",start:"2027-01-18",end:"2027-01-22",cat:"Travel & Tourism",layer:"mice"},
+  {id:"mice-3",name:"WCA Worldwide Conference 2027",start:"2027-02-21",end:"2027-02-25",cat:"Trade Conferences",layer:"mice"},
+  {id:"mice-4",name:"Black Hat Asia 2027",start:"2027-02-28",end:"2027-03-03",cat:"Exhibitions, Tech",layer:"mice"},
+  {id:"mice-5",name:"Asia Photonics Expo 2027",start:"2027-03-03",end:"2027-03-05",cat:"Advanced Manufacturing",layer:"mice"},
+  {id:"mice-6",name:"Geo Connect & Digital Construction Asia 2027",start:"2027-03-17",end:"2027-03-18",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-7",name:"TyreXpo Asia 2027",start:"2027-03-17",end:"2027-03-19",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-8",name:"APAO 2027 (Asia-Pacific Ophthalmology)",start:"2027-03-18",end:"2027-03-21",cat:"Association Conventions",layer:"mice"},
+  {id:"mice-9",name:"inter airport Southeast Asia 2027",start:"2027-03-23",end:"2027-03-25",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-10",name:"eCommerce Expo Asia 2027",start:"2027-04-07",end:"2027-04-08",cat:"Exhibitions, Tech",layer:"mice"},
+  {id:"mice-11",name:"IDF World Diabetes Congress 2027",start:"2027-04-10",end:"2027-04-12",cat:"Association Conventions",layer:"mice"},
+  {id:"mice-12",name:"Singapore Maritime Week 2027",start:"2027-04-12",end:"2027-04-16",cat:"Maritime",layer:"mice"},
+  {id:"mice-13",name:"Sea Asia & OSEA 2027",start:"2027-04-13",end:"2027-04-15",cat:"Maritime",layer:"mice"},
+  {id:"mice-14",name:"PCMA Convening APAC 2027",start:"2027-04-18",end:"2027-04-20",cat:"Meeting & Incentive Travel",layer:"mice"},
+  {id:"mice-15",name:"Food & Hospitality Asia 2027",start:"2027-04-20",end:"2027-04-23",cat:"Exhibitions, Lifestyle",layer:"mice"},
+  {id:"mice-16",name:"GITEX AI Asia 2027",start:"2027-04-29",end:"2027-04-30",cat:"Exhibitions, Tech",layer:"mice"},
+  {id:"mice-17",name:"IMDEX Asia 2027 (dates TBC)",start:"2027-05-04",end:"2027-05-06",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-18",name:"TFWA Asia Pacific 2027",start:"2027-05-09",end:"2027-05-13",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-19",name:"HR Tech Asia 2027",start:"2027-05-10",end:"2027-05-13",cat:"Trade Conferences",layer:"mice"},
+  {id:"mice-20",name:"Ecosperity Week 2027",start:"2027-05-11",end:"2027-05-14",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-21",name:"Asia Tech x Singapore (ATxSG) 2027",start:"2027-05-26",end:"2027-05-28",cat:"Exhibitions, Tech",layer:"mice"},
+  {id:"mice-22",name:"NRF Retail's Big Show Asia Pacific 2027",start:"2027-06-01",end:"2027-06-03",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-23",name:"Asia Pacific Energy Assembly 2027",start:"2027-06-09",end:"2027-06-10",cat:"Energy",layer:"mice"},
+  {id:"mice-24",name:"TIACA Executive Summit 2027",start:"2027-06-21",end:"2027-06-23",cat:"Trade Conferences",layer:"mice"},
+  {id:"mice-25",name:"IEEE EMBC 2027 (Biomedical Engineering)",start:"2027-07-11",end:"2027-07-15",cat:"Association Conventions",layer:"mice"},
+  {id:"mice-26",name:"SIGEP Asia & Restaurant Asia 2027",start:"2027-07-14",end:"2027-07-16",cat:"Exhibitions, Lifestyle",layer:"mice"},
+  {id:"mice-27",name:"ITAP & CeMAT Southeast Asia 2027",start:"2027-07-20",end:"2027-07-22",cat:"Advanced Manufacturing",layer:"mice"},
+  {id:"mice-28",name:"The Business Show Asia 2027",start:"2027-09-01",end:"2027-09-02",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-29",name:"InnoTrans Asia 2027",start:"2027-09-07",end:"2027-09-09",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-30",name:"SuperAI Singapore 2027",start:"2027-09-08",end:"2027-09-09",cat:"Exhibitions, Tech",layer:"mice"},
+  {id:"mice-31",name:"Seafood Expo Asia 2027",start:"2027-09-08",end:"2027-09-10",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-32",name:"Sibos 2027",start:"2027-09-20",end:"2027-09-23",cat:"Financial Services",layer:"mice"},
+  {id:"mice-33",name:"MRO Asia-Pacific 2027",start:"2027-09-21",end:"2027-09-23",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-34",name:"Valve World Expo Southeast Asia 2027",start:"2027-09-23",end:"2027-09-24",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-35",name:"TOKEN2049 Singapore 2027 (dates TBC)",start:"2027-10-06",end:"2027-10-07",cat:"Financial Services",layer:"mice"},
+  {id:"mice-36",name:"Milken Institute Asia Summit 2027 (dates TBC)",start:"2027-10-06",end:"2027-10-08",cat:"Financial Services",layer:"mice"},
+  {id:"mice-37",name:"Tech Week Singapore 2027",start:"2027-10-13",end:"2027-10-14",cat:"Exhibitions, Tech",layer:"mice"},
+  {id:"mice-38",name:"ITB Asia 2027 (dates TBC)",start:"2027-10-20",end:"2027-10-22",cat:"Travel & Tourism",layer:"mice"},
+  {id:"mice-39",name:"transport logistic Southeast Asia 2027",start:"2027-10-25",end:"2027-10-27",cat:"Exhibitions",layer:"mice"},
+  {id:"mice-40",name:"Singapore Intl Energy Week 2027 (dates TBC)",start:"2027-10-25",end:"2027-10-29",cat:"Energy",layer:"mice"},
+  {id:"mice-41",name:"Singapore FinTech Festival 2027 (dates TBC)",start:"2027-11-17",end:"2027-11-19",cat:"Financial Services",layer:"mice"},
+  {id:"mice-42",name:"IEEE ICIP 2027 (Image Processing)",start:"2027-11-29",end:"2027-12-03",cat:"Association Conventions",layer:"mice"},
+  {id:"mice-43",name:"ESMO Asia Congress 2027 (dates TBC)",start:"2027-12-03",end:"2027-12-05",cat:"Dental/Medical",layer:"mice"},
+];
 const SG_EVENTS_RAW = [];
 const SG_EVENTS = [];
 // Visitor intensity by source market, 2027 (researched 27 Oct 2026).
@@ -112,7 +165,16 @@ const PUBLIC_HOLIDAYS = [
 const CAMPAIGNS = [];             // [{id, name, month, endMonth?, tagline, layer:"campaign"}]
 const SEED_VENUE_EVENTS = [];     // venue activities arrive via the import tool
 
-const CONFERENCE_DATES = new Set();
+// The heaviest delegate days, from confirmed dates only: APAO (7,000+),
+// Maritime Week with Sea Asia, FHA (~60,000), ATxSG, Sibos and Tech Week.
+const CONFERENCE_DATES = new Set([
+  "2027-03-18","2027-03-19","2027-03-20","2027-03-21",
+  "2027-04-12","2027-04-13","2027-04-14","2027-04-15","2027-04-16",
+  "2027-04-20","2027-04-21","2027-04-22","2027-04-23",
+  "2027-05-26","2027-05-27","2027-05-28",
+  "2027-09-20","2027-09-21","2027-09-22","2027-09-23",
+  "2027-10-13","2027-10-14",
+]);
 const DOUBLE_DIGIT_DATES = new Set([
   "2027-01-01", "2027-02-02", "2027-03-03", "2027-04-04", "2027-05-05", "2027-06-06",
   "2027-07-07", "2027-08-08", "2027-09-09", "2027-10-10", "2027-11-11", "2027-12-12",
