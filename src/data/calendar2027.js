@@ -5,8 +5,8 @@
 // school holidays, SG & MICE events, visitor intensity, campaigns, and each
 // venue's hot/cold demand). Year-independent constants (month names, colours,
 // venue keys & sub-brands) are re-exported from calendar2026.js so the two years
-// never drift apart. Public and school holidays are filled in; the rest of the
-// year-specific data starts empty here.
+// never drift apart. Public and school holidays and visitor intensity are filled
+// in; the rest of the year-specific data starts empty here.
 //
 // To populate: fill the arrays/Sets/VENUE_HC_RAW[venue].data below (or import via
 // the app's "Import Venue Calendar" tool once the template comes back).
@@ -47,11 +47,43 @@ function parseVenueData(venueKey) {
   return result;
 }
 
-// ─── YEAR-SPECIFIC DATA (2027: holidays filled; events, visitors, campaigns blank) ───
+// ─── YEAR-SPECIFIC DATA (2027: holidays and visitor intensity filled; events and campaigns blank) ───
 const MICE_EVENTS = [];
 const SG_EVENTS_RAW = [];
 const SG_EVENTS = [];
-const VISITOR_DATA = [];          // [{market, arrivals, data:{Jan:"Peak",...}}]
+// Visitor intensity by source market, 2027 (researched 27 Oct 2026).
+// Each market starts from its 2026 month pattern, then moves where that
+// market's own 2027 holidays move:
+//   - Malaysia: Hari Raya Puasa falls on 10 Mar 2027 → Mar High.
+//   - Australia: Easter (26–29 Mar) and the Vic/Qld autumn break start in
+//     March; NSW, WA and SA autumn breaks run 10–25 Apr; spring breaks start
+//     18 and 25 Sep → Mar High, Apr Mod, Sep High.
+//   - India: Diwali is 29 Oct 2027 (8 Nov in 2026); May is the summer-holiday
+//     peak → May High, Oct Peak, Nov High.
+//   - Japan: Golden Week 29 Apr–5 May; no Silver Week in 2027 → Sep Mod.
+//   - Philippines: Holy Week is 25–28 Mar 2027 (Proclamation 1427) → Mar High,
+//     Apr Mod.
+//   - South Korea: Seollal 6–9 Feb; Chuseok 14–16 Sep (late Sep in 2026) →
+//     Sep High.
+//   - United Kingdom: Easter Sunday is 28 Mar, so the Easter school break
+//     starts in March → Mar High.
+//   - Unchanged: Mainland China (Spring Festival 6–12 Feb, Golden Week
+//     1–7 Oct, both in the same months as 2026), Indonesia (Lebaran 6–15 Mar,
+//     school break about 21 Jun–10 Jul), USA.
+// Arrivals: 2025 full year (STB) and the 2026 Jan–Sep change (STB), where
+// published; otherwise the 2026 figure is kept.
+const VISITOR_DATA = [
+  {market:"Mainland China",arrivals:"3.1M · 2026 +5%",data:{Jan:"Mod",Feb:"Peak",Mar:"Mod",Apr:"Low",May:"Low",Jun:"Mod",Jul:"Mod",Aug:"Mod",Sep:"Low",Oct:"Peak",Nov:"High",Dec:"Mod"}},
+  {market:"Indonesia",arrivals:"2.4M · 2026 −10%",data:{Jan:"High",Feb:"High",Mar:"Peak",Apr:"Mod",May:"Mod",Jun:"High",Jul:"Peak",Aug:"High",Sep:"Mod",Oct:"Mod",Nov:"High",Dec:"High"}},
+  {market:"Malaysia",arrivals:"1.3M · 2026 flat",data:{Jan:"High",Feb:"Peak",Mar:"High",Apr:"Mod",May:"Mod",Jun:"High",Jul:"Peak",Aug:"High",Sep:"Mod",Oct:"Mod",Nov:"High",Dec:"Peak"}},
+  {market:"Australia",arrivals:"1.3M · 2026 +1%",data:{Jan:"Peak",Feb:"High",Mar:"High",Apr:"Mod",May:"Low",Jun:"Mod",Jul:"Peak",Aug:"Peak",Sep:"High",Oct:"Mod",Nov:"Mod",Dec:"High"}},
+  {market:"India",arrivals:"1.2M · 2026 −6%",data:{Jan:"Mod",Feb:"Mod",Mar:"Mod",Apr:"Mod",May:"High",Jun:"High",Jul:"Peak",Aug:"Peak",Sep:"Mod",Oct:"Peak",Nov:"High",Dec:"High"}},
+  {market:"Japan",arrivals:"~630K +10%",data:{Jan:"Mod",Feb:"Mod",Mar:"High",Apr:"Mod",May:"Peak",Jun:"Mod",Jul:"Peak",Aug:"High",Sep:"Mod",Oct:"Mod",Nov:"Mod",Dec:"Mod"}},
+  {market:"Philippines",arrivals:"726K -7%",data:{Jan:"Mod",Feb:"Mod",Mar:"High",Apr:"Mod",May:"Mod",Jun:"High",Jul:"Peak",Aug:"Peak",Sep:"Mod",Oct:"Mod",Nov:"High",Dec:"High"}},
+  {market:"USA",arrivals:"~720K +4%",data:{Jan:"Mod",Feb:"Low",Mar:"Low",Apr:"Mod",May:"Mod",Jun:"High",Jul:"Peak",Aug:"Peak",Sep:"Mod",Oct:"Mod",Nov:"Mod",Dec:"High"}},
+  {market:"South Korea",arrivals:"~610K stable",data:{Jan:"Mod",Feb:"Peak",Mar:"Low",Apr:"Mod",May:"Mod",Jun:"Mod",Jul:"Peak",Aug:"High",Sep:"High",Oct:"High",Nov:"Mod",Dec:"Mod"}},
+  {market:"United Kingdom",arrivals:"~590K stable",data:{Jan:"Low",Feb:"Low",Mar:"High",Apr:"High",May:"Mod",Jun:"High",Jul:"Peak",Aug:"Peak",Sep:"Mod",Oct:"Mod",Nov:"Low",Dec:"High"}},
+];
 // MOE school terms and holidays for 2027 (MOE, 14 July 2026).
 const SCHOOL_HOLIDAYS = [
   {name:"Term 1 Break",start:"2027-03-13",end:"2027-03-21"},
