@@ -5,8 +5,8 @@
 // school holidays, SG & MICE events, visitor intensity, campaigns, and each
 // venue's hot/cold demand). Year-independent constants (month names, colours,
 // venue keys & sub-brands) are re-exported from calendar2026.js so the two years
-// never drift apart. Public and school holidays, visitor intensity and MICE
-// events are filled in; the rest of the year-specific data starts empty here.
+// never drift apart. Public and school holidays, visitor intensity, MICE and SG
+// events are filled in; campaigns and venue demand start empty here.
 //
 // To populate: fill the arrays/Sets/VENUE_HC_RAW[venue].data below (or import via
 // the app's "Import Venue Calendar" tool once the template comes back).
@@ -47,7 +47,7 @@ function parseVenueData(venueKey) {
   return result;
 }
 
-// ─── YEAR-SPECIFIC DATA (2027: holidays, visitor intensity and MICE filled; SG events and campaigns blank) ───
+// ─── YEAR-SPECIFIC DATA (2027: holidays, visitor intensity, MICE and SG events filled; campaigns blank) ───
 // MICE events in Singapore, 2027 (researched 27 Oct 2026 from STB/SECB, the
 // venues' calendars and the organisers' own pages). Dates are the organiser's
 // published 2027 dates. "(dates TBC)" marks a big annual event whose 2027
@@ -102,8 +102,47 @@ const MICE_EVENTS = [
   {id:"mice-42",name:"IEEE ICIP 2027 (Image Processing)",start:"2027-11-29",end:"2027-12-03",cat:"Association Conventions",layer:"mice"},
   {id:"mice-43",name:"ESMO Asia Congress 2027 (dates TBC)",start:"2027-12-03",end:"2027-12-05",cat:"Dental/Medical",layer:"mice"},
 ];
-const SG_EVENTS_RAW = [];
-const SG_EVENTS = [];
+// Big public events in Singapore, 2027, that fill hotels without being MICE
+// (researched 27 Oct 2026; MICE events are in MICE_EVENTS above). "TBC"
+// marks an event placed on its 2026 weekdays, or known only by month.
+const SG_EVENTS_RAW = [
+  {m:1,sd:15,ed:17,ds:"15–17 Jan",n:"EVO Singapore 2027 (with TEKKEN World Tour Finals)",v:"Marina Bay Sands Expo",i:"Esports / Fighting games",o:"Evo",c:"",w:"",em:[],p:"Fighting-game players and fans, many flying in from across Asia",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:12,ed:null,ds:"12 Feb",n:"Maroon 5 in concert",v:"National Stadium",i:"Concert / Entertainment",o:"Concert Promoters",c:"",w:"",em:[],p:"General public, regional fans",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:20,ed:null,ds:"20 Feb",n:"YOASOBI Super Planet Tour",v:"National Stadium",i:"Concert / J-pop",o:"Concert Promoters",c:"",w:"",em:[],p:"J-pop fans; the tour's only Southeast Asia stop, so it draws regional travellers",no:"",why:"",tier:"",s:null,st:""},
+  {m:2,sd:25,ed:28,ds:"25–28 Feb (TBC)",n:"HSBC Women's World Championship 2027 (dates TBC)",v:"Sentosa Golf Club",i:"Sport / Golf",o:"HSBC / LPGA",c:"",w:"",em:[],p:"Golf fans, corporate hospitality guests",no:"Placed on the 2026 edition's weekdays (26 Feb–1 Mar 2026)",why:"",tier:"",s:null,st:""},
+  {m:3,sd:15,ed:28,ds:"15–28 Mar",n:"BLAST Premier Open Singapore 2027 (Counter-Strike)",v:"TBD – Singapore",i:"Esports / Counter-Strike",o:"BLAST",c:"",w:"",em:[],p:"Esports teams, fans and media",no:"Arena not yet announced",why:"",tier:"",s:null,st:""},
+  {m:4,sd:13,ed:14,ds:"13–14 Apr",n:"Bruno Mars – The Romantic Tour (shows 1–2)",v:"National Stadium",i:"Concert / Entertainment",o:"Concert Promoters",c:"",w:"",em:[],p:"Fans from across the region; four stadium nights",no:"Same week as Singapore Maritime Week and Sea Asia",why:"Four stadium shows in one week on top of Maritime Week and FHA",tier:"⭐ HIGH",s:null,st:""},
+  {m:4,sd:17,ed:18,ds:"17–18 Apr",n:"Bruno Mars – The Romantic Tour (shows 3–4)",v:"National Stadium",i:"Concert / Entertainment",o:"Concert Promoters",c:"",w:"",em:[],p:"Fans from across the region; four stadium nights",no:"",why:"Four stadium shows in one week on top of Maritime Week and FHA",tier:"⭐ HIGH",s:null,st:""},
+  {m:6,sd:null,ed:null,ds:"TBC Jun",n:"FIBA 3x3 World Cup 2027",v:"TBD – Singapore",i:"Sport / Basketball",o:"FIBA / Sport Singapore",c:"",w:"",em:[],p:"40 national teams over seven days, officials and fans",no:"Month confirmed, dates not yet published",why:"",tier:"",s:null,st:""},
+  {m:10,sd:8,ed:10,ds:"8–10 Oct",n:"Formula 1 Singapore Grand Prix 2027 ⭐⭐",v:"Marina Bay Street Circuit",i:"Sport / Motorsport",o:"Singapore GP Pte Ltd",c:"",w:"www.singaporegp.sg",em:[],p:"Race fans and corporate hospitality from around the world",no:"Race week usually brings the Milken Asia Summit and TOKEN2049 alongside",why:"Singapore's busiest visitor week of the year for Marina Bay",tier:"⭐⭐ VERY HIGH",s:null,st:"⭐⭐"},
+  {m:12,sd:4,ed:5,ds:"4–5 Dec (TBC)",n:"Standard Chartered Singapore Marathon 2027 (dates TBC)",v:"City-wide",i:"Sport / Running",o:"Standard Chartered (title sponsor)",c:"",w:"",em:[],p:"Runners, many from overseas",no:"Placed on the 2026 edition's weekdays (5–6 Dec 2026)",why:"",tier:"",s:null,st:""},
+];
+const SG_EVENTS = SG_EVENTS_RAW.map((e, i) => {
+  const sd = e.sd || 1;
+  const ed = e.ed || sd;
+  return {
+    id: `sg-${i}`,
+    name: e.n,
+    month: e.m - 1,
+    dateStr: e.ds,
+    venue: e.v,
+    type: e.i,
+    industry: e.i,
+    organiser: e.o,
+    contact: e.c,
+    website: e.w,
+    emails: e.em || [],
+    participants: e.p,
+    notes: e.no,
+    why: e.why,
+    tier: e.tier,
+    sales: e.s,
+    star: e.st,
+    layer: "sg",
+    start: `${YEAR}-${String(e.m).padStart(2, "0")}-${String(sd).padStart(2, "0")}`,
+    end: `${YEAR}-${String(e.m).padStart(2, "0")}-${String(ed).padStart(2, "0")}`,
+  };
+});
 // Visitor intensity by source market, 2027 (researched 27 Oct 2026).
 // Each market starts from its 2026 month pattern, then moves where that
 // market's own 2027 holidays move:
