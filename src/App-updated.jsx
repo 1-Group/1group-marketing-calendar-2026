@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Calendar, Plus, Edit, Trash2, Flame, Snowflake, X, Search, Copy, RotateCcw, Eye, EyeOff, BarChart3, Grid3X3, MapPin, Users, GraduationCap, Megaphone, ChevronLeft, ChevronRight, Check, TrendingUp, Star, Building2, Thermometer, Lock, LogOut, Shield, KeyRound, User as UserIcon, AlertCircle, Briefcase, Utensils, Mail, Globe, Phone, ExternalLink, FileText, Download, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { VIEWS } from "./lib/views.js";
+
+// One icon per view; the list of views itself is src/lib/views.js.
+const VIEW_ICONS = { board: Grid3X3, month: Calendar, heatmap: BarChart3 };
 
 // ─── AUTH ───
 // Sign-in is a single email→OTP flow (see SignIn below + /api/auth/*). The
@@ -58,6 +62,22 @@ function ratingFromCount(count, isGroup) {
   if (n >= 5) return "hot-hot";
   if (n >= 2) return "hot";
   return "cold";
+}
+
+// Session Logs: one heartbeat to the server, with the signed session token.
+// Fire-and-forget; never throws. See api/activity/heartbeat.js.
+function sendHeartbeat(body) {
+  try {
+    let token = null;
+    try { token = localStorage.getItem("calendar-otp-session"); } catch {}
+    if (!token) return;
+    fetch("/api/activity/heartbeat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* the log must never break the calendar */ }
 }
 
 // ─── STORAGE WRAPPER (localStorage for Vercel) ───
@@ -142,6 +162,8 @@ const eventYear = (e) => (e && e.start ? parseInt(String(e.start).slice(0, 4), 1
 
 export default function MarketingCalendar() {
   const [view, setView] = useState("board");
+  const viewRef = useRef(view);          // Session Logs heartbeat: the view now
+  const lastActive = useRef(Date.now()); // …and when the person last used the page
   const [quarter, setQuarter] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [search, setSearch] = useState("");
@@ -376,6 +398,8 @@ export default function MarketingCalendar() {
   }, [logAccess]);
 
   const handleSignOut = useCallback(async () => {
+    // Session Logs: this session ends now, not when it goes idle.
+    sendHeartbeat({ view: viewRef.current, signout: true });
     setUser(null);
     try { await storage.delete("calendar-user"); } catch {}
     // Also drop the signed session token so a stale/expired one never lingers
@@ -383,6 +407,39 @@ export default function MarketingCalendar() {
     try { localStorage.removeItem("calendar-otp-session"); } catch {}
     setSelectedZone("group");
   }, []);
+
+  // ─── SESSION LOGS HEARTBEAT (Chris Millar, 26 Nov 2026) ───────────────────
+  // Tells /api/activity/heartbeat the calendar is open and which view, so
+  // sessionlogs.1-group.ai can show who uses it and for how long. Only while
+  // the tab is in front AND the person has clicked, typed, scrolled or tapped
+  // in the last five minutes; coming back to the tab counts at once, and so
+  // does a change of view. Identity is the signed session token. Nothing on
+  // screen, typed or searched is ever sent.
+  useEffect(() => {
+    if (!user) return undefined;
+    const ping = (opened) => {
+      if (document.visibilityState !== "visible") return;
+      if (!opened && Date.now() - lastActive.current > 5 * 60_000) return;
+      sendHeartbeat({ view: viewRef.current, opened });
+    };
+    const active = () => { lastActive.current = Date.now(); };
+    const back = () => { if (document.visibilityState === "visible") { active(); ping(false); } };
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, active, { passive: true }));
+    document.addEventListener("visibilitychange", back);
+    ping(true);
+    const timer = setInterval(() => ping(false), 60_000);
+    return () => {
+      clearInterval(timer);
+      events.forEach((e) => window.removeEventListener(e, active));
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [user]);
+  useEffect(() => {
+    if (viewRef.current === view) return;
+    viewRef.current = view;
+    if (user && document.visibilityState === "visible") { lastActive.current = Date.now(); sendHeartbeat({ view, opened: true }); }
+  }, [view, user]);
 
   const saveEvents = useCallback(async (evts) => {
     setCustomEvents(evts);
@@ -980,7 +1037,7 @@ export default function MarketingCalendar() {
                 ))}
               </div>
               <div className="flex gap-1">
-                {[["board", "Board", Grid3X3], ["month", "Month", Calendar], ["heatmap", "Heatmap", BarChart3]].map(([v, label, Icon]) => (
+                {VIEWS.map(({ id: v, label }) => [v, label, VIEW_ICONS[v] || Calendar]).map(([v, label, Icon]) => (
                   <button key={v} onClick={() => { setView(v); savePrefs(layers, v, quarter, selectedZone); }} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-md ${view === v ? "bg-purple-600 text-white" : t.inactive}`}>
                     <Icon className="w-3.5 h-3.5" />{label}
                   </button>
